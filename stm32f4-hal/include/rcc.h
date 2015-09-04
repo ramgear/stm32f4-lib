@@ -19,6 +19,15 @@
 /* Includes ------------------------------------------------------------------*/
 #include <cpu.h>
 
+#define RCC_CLK_ON_POS_HSI		0
+#define RCC_CLK_ON_POS_HSE		16
+#define RCC_CLK_ON_POS_PLL		24
+#define RCC_CLK_ON_POS_PLLI2S	26
+#define RCC_CLK_ON_POS_LSI		0
+#define RCC_CLK_ON_POS_LSE		0
+
+#define RCC_CLK_BASE_OFF		8
+
 /* Exported types ------------------------------------------------------------*/
  /**
    * @brief Reset and Clock Control
@@ -29,12 +38,12 @@
   * @brief STM32F2 clock sources.
   */
  typedef enum rcc_clk {
-     RCC_CLK_PLLI2S = (uint16)((offsetof(rcc_t, CR) << 8) | RCC_CR_PLLI2SON), /**< Dedicated PLL for I2S. */
-     RCC_CLK_PLL    = (uint16)((offsetof(rcc_t, CR) << 8) | RCC_CR_PLLON), /**< Main PLL, clocked by HSI or HSE. */
-     RCC_CLK_HSE    = (uint16)((offsetof(rcc_t, CR) << 8) | RCC_CR_HSEON), /**< High speed external. */
-     RCC_CLK_HSI    = (uint16)((offsetof(rcc_t, CR) << 8) | RCC_CR_HSION), /**< High speed internal. */
-     RCC_CLK_LSE    = (uint16)((offsetof(rcc_t, BDCR) << 8) | RCC_BDCR_LSEON), /**< Low-speed external * (32.768 KHz). */
-     RCC_CLK_LSI    = (uint16)((offsetof(rcc_t, CSR) << 8) | RCC_CSR_LSION), /**< Low-speed internal * (approximately 32 KHz). */
+     RCC_CLK_PLLI2S = (uint16)((offsetof(rcc_t, CR) << RCC_CLK_BASE_OFF) | RCC_CLK_ON_POS_PLLI2S), /**< Dedicated PLL for I2S. */
+     RCC_CLK_PLL    = (uint16)((offsetof(rcc_t, CR) << RCC_CLK_BASE_OFF) | RCC_CLK_ON_POS_PLL), /**< Main PLL, clocked by HSI or HSE. */
+     RCC_CLK_HSE    = (uint16)((offsetof(rcc_t, CR) << RCC_CLK_BASE_OFF) | RCC_CLK_ON_POS_HSE), /**< High speed external. */
+     RCC_CLK_HSI    = (uint16)((offsetof(rcc_t, CR) << RCC_CLK_BASE_OFF) | RCC_CLK_ON_POS_HSI), /**< High speed internal. */
+     RCC_CLK_LSE    = (uint16)((offsetof(rcc_t, BDCR) << RCC_CLK_BASE_OFF) | RCC_CLK_ON_POS_LSE), /**< Low-speed external * (32.768 KHz). */
+     RCC_CLK_LSI    = (uint16)((offsetof(rcc_t, CSR) << RCC_CLK_BASE_OFF) | RCC_CLK_ON_POS_LSE), /**< Low-speed internal * (approximately 32 KHz). */
  } rcc_clk;
 
  /**
@@ -113,7 +122,7 @@
  typedef enum rcc_pllsrc
  {
      RCC_PLLSRC_HSI = 0,
-     RCC_PLLSRC_HSE = RCC_PLLCFGR_PLLSRC,
+     RCC_PLLSRC_HSE = 1,
  } rcc_pllsrc;
 
  /**
@@ -210,39 +219,12 @@
      RCC_AHB_SYSCLK_DIV_512 = RCC_CFGR_HPRE_DIV512,
  } rcc_ahb_divider;
 
- /**
-  * @brief STM32F4 PLL configuration values.
-  * Point to one of these with the "data" field in a struct rcc_pll_cfg.
-  * @see struct rcc_pll_cfg.
-  */
- typedef struct rcc_pll_data {
-     uint08 pllq;      /**<
-                       * @brief PLLQ value.
-                       * Allowed values: 4, 5, ..., 15. */
-     uint08 pllp;      /**<
-                       * @brief PLLP value.
-                       * Allowed values: 2, 4, 6, 8. */
-     uint16 plln;     /**<
-                       * @brief PLLN value.
-                       * Allowed values: 192, 193, ..., 432. */
-     uint08 pllm;      /**<
-                       * @brief PLLM value.
-                       * Allowed values: 2, 3, ..., 63. */
- } rcc_pll_data;
-
  typedef enum rcc_sysclk_src
  {
      RCC_CLKSRC_HSI = 0x0,
      RCC_CLKSRC_HSE = 0x1,
      RCC_CLKSRC_PLL = 0x2,
  } rcc_sysclk_src;
-
- typedef struct rcc_pll_cfg
- {
-     rcc_pllsrc  	pllsrc;     /**< PLL source */
-
-     rcc_pll_data	data;
- } rcc_pll_cfg;
 
 /* Exported constants --------------------------------------------------------*/
 #define RCC_REG			((rcc_t	*)RCC_BASE)
@@ -258,29 +240,47 @@
 /* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions --------------------------------------------------------*/
-void
-rcc_configure_pll(rcc_pll_cfg *pll_cfg);
-
-void
+ boolean
 rcc_turn_on_clk(rcc_clk clock);
-void
+
+boolean
 rcc_turn_off_clk(rcc_clk clock);
+
 boolean
 rcc_is_clk_on(rcc_clk clock);
+
 boolean
 rcc_is_clk_ready(rcc_clk clock);
 
 void
+rcc_set_pllsrc(rcc_pllsrc pllsrc);
+
+void
+rcc_configure_pll(uint32 plln, uint32 pllm, uint32 pllp, uint32 pllq);
+
+void
 rcc_clk_enable(rcc_clk_id id);
+
 void
 rcc_reset_dev(rcc_clk_id id);
+
+void
+rcc_set_prescaler(rcc_prescaler prescaler, uint32 divider);
+
+boolean
+rcc_switch_sysclk(rcc_sysclk_src sysclk_src);
 
 rcc_clk_bus
 rcc_dev_clk(rcc_clk_id id);
 
 uint32
+rcc_get_sys_clk_freq(void);
+
+uint32
 rcc_get_clk_freq(rcc_clk_id id);
 
+void
+rcc_clk_update(void);
 
 /**
  * @brief Enable the clock security system (CSS).

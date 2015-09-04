@@ -41,8 +41,6 @@ HardwareSerial	serail1;
 
 void
 btn_irq_handler(void *);
-void
-systick_irq_handler(void *);
 
 int
 main(int argc, char* argv[])
@@ -50,9 +48,9 @@ main(int argc, char* argv[])
   // At this stage the system clock should have already been configured
   // at high speed.
 
-	serail1 = SERIAL1;
-	serail1.m_RxPin	= PB6;
-	serail1.m_TxPin	= PB7;
+	serail1 = SERIAL4;
+	serail1.m_RxPin	= PA1;
+	serail1.m_TxPin	= PA0;
 
 	led3 = PD13;
 	led4 = PD12;
@@ -60,14 +58,19 @@ main(int argc, char* argv[])
 	btn = PB0;
 	btn.AttachInterrupt(btn_irq_handler);
 
-	SystemTick::SetFrequency(1000);
-	SystemTick::AttachInterrupt(systick_irq_handler);
+	SystemTick::Init();
+	SystemTick::Start();
 
+	serail1.Begin(9600);
+
+	trace("RCC Clock: %d\n", rcc_get_sys_clk_freq());
 
   // Infinite loop
   while (1)
     {
        // Add your code here.
+	  led4 = !led4;
+	  __delay_us(500000);
     }
 }
 
@@ -77,15 +80,6 @@ btn_irq_handler(void *driver)
 	(void)driver;
 
 	led3 = !led3;
-}
-
-void
-systick_irq_handler(void *p_ticks)
-{
-	if(*((uint32 *)p_ticks) % 500 == 0)
-	{
-		led4 = !led4;
-	}
 }
 
 #pragma GCC diagnostic pop

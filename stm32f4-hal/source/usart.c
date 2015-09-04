@@ -16,6 +16,9 @@
 #define	USART_ISR(NUM,AS)	\
 		void U##AS##RT##NUM##_IRQHandler(void)
 
+#define	USART_FLAG_SET			1
+#define	USART_FLAG_RESET		0
+
 typedef struct usart_dev
 {
 	const	uint32			reg;
@@ -23,12 +26,31 @@ typedef struct usart_dev
 	const	nvic_irq_num	irq;
 } usart_dev;
 
+typedef union
+{
+	struct
+	{
+		uint32		stx			:8;	/* Start of frame */
+		uint32		etx			:8;	/* End of frame */
+		uint32		esc			:8;	/* Data escape */
+		uint32		enable		:1;
+		uint32		xfer		:1;
+		uint32		esc_found 	:1;
+	} flags;
+	uint32		all;
+} usart_frame_ctrl;
+
 typedef struct usart_driver
 {
 	const usart_dev		*p_dev;
 	void 				*p_owner;
 	usart_rx_handler	rx_handler;
 	usart_tx_handler	tx_handler;
+	uint08				rx_buffer[USART_BUFFER_SIZE];
+	uint08				tx_buffer[USART_BUFFER_SIZE];
+	uint08				*p_rx_current;
+	uint08				data_count;
+	usart_frame_ctrl	frame_ctrl;
 } usart_driver;
 
 __lookup_table
@@ -43,8 +65,6 @@ usart_dev usart_dev_table[USART_NUM_MAX] =
 };
 
 usart_driver usart_drivers[USART_NUM_MAX];
-
-char usart_rx_buffer;
 
 static inline const usart_dev *
 usart_get_dev(usart_num num)
@@ -76,14 +96,24 @@ usart_init(usart_num num)
 	if(!usart_available(num))
 		return;
 
+	usart_driver	*driver = &usart_drivers[num];
 	const usart_dev	*dev = usart_get_dev(num);
 
 	rcc_clk_enable(dev->clk_id);
 	nvic_irq_enable(dev->irq);
 
+	/* initial driver */
+	driver->p_dev 					= dev;
+
+	/* initial framing control */
+	usart_frame_config(num, USART_FRAME_STX, USART_FRAME_ETX, USART_FRAME_ESC);
+	usart_frame_enable(num, false);
+
 	/* enable receive and transmit mode */
 	usart_t *usart = (usart_t *)dev->reg;
-	usart->CR1	= USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
+	usart->CR1	= USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;
+
+	/* Parity: none, stop bit: 0, flow control: none */
 	usart->CR2	= 0;
 	usart->CR3	= 0;
 
@@ -157,10 +187,26 @@ usart_get_af(usart_num num)
 	case SERIAL4:
 	case SERIAL5:
 	case SERIAL6:
-		return GPIO_AF_USART_1_2_3;
+		return GPIO_AF_USART_4_5_6;
 	default:
 		return GPIO_AF_INVALID;
 	}
+}
+
+void
+usart_frame_enable(usart_num num, boolean enable)
+{
+	usart_drivers[num].frame_ctrl.flags.enable = enable;
+}
+
+void
+usart_frame_config(usart_num num, uint08 stx, uint08 etx, uint08 esc)
+{
+	usart_driver *driver = &usart_drivers[num];
+
+	driver->frame_ctrl.flags.stx	= stx;
+	driver->frame_ctrl.flags.etx	= etx;
+	driver->frame_ctrl.flags.esc	= esc;
 }
 
 void
@@ -175,6 +221,92 @@ usart_set_tx_handler(usart_num num, usart_tx_handler handler)
 	usart_drivers[num].tx_handler = handler;
 }
 
+static inline void
+usart_rx_add_buffer(usart_driver *driver, uint08 data)
+{
+	/*
+	 * Check to reset counter and buffer
+	 * note: it will overwrite previous data in buffer in case received more than buffer size.
+	 */
+	if(driver->data_count == USART_BUFFER_SIZE)
+	{
+		driver->data_count 		= 0;
+		driver->p_rx_current	= driver->rx_buffer;
+	}
+
+	*driver->p_rx_current++ = data;
+	driver->data_count++;
+}
+
+static inline void
+usart_rx_irq_handler(usart_driver *driver, uint08 data)
+{
+	if(driver->frame_ctrl.flags.enable)
+	{
+		/* Check byte stuffing frame control */
+		if(data == driver->frame_ctrl.flags.esc)
+		{
+			/* Only set stuffing flag for byte stuffing found */
+			driver->frame_ctrl.flags.esc_found = USART_FLAG_SET;
+		}
+		else
+		{
+			if(driver->frame_ctrl.flags.esc_found != USART_FLAG_RESET)
+			{
+				/* at this pointer previous data is byte stuffing */
+
+				/* Save data only when rx found start byte */
+				if(driver->frame_ctrl.flags.xfer != USART_FLAG_RESET)
+				{
+					usart_rx_add_buffer(driver, data);
+				}
+
+				/* reset byte stuffing flag */
+				driver->frame_ctrl.flags.esc_found = USART_FLAG_RESET;
+			}
+			else
+			{
+				/* At this point byte stuffing always be reset state */
+				/* Check starting frame control */
+				if(data == driver->frame_ctrl.flags.stx)
+				{
+					/*
+					 * Note: what happen when found start byte more than 1 time before found end byte?
+					 * 		Temporary use reset buffer and counter (avoid all previous received data!).
+					 */
+					/* Set rx start flag */
+					driver->frame_ctrl.flags.xfer = USART_FLAG_SET;
+
+					/* Reset buffer and counter */
+					driver->p_rx_current			= driver->rx_buffer;
+					driver->data_count				= 0;
+				}
+				else if(driver->frame_ctrl.flags.xfer != USART_FLAG_RESET)
+				{
+					if(data == driver->frame_ctrl.flags.etx)
+					{
+						/* Set rx end flag */
+						driver->frame_ctrl.flags.xfer = USART_FLAG_RESET;
+
+						/* framing is end then callback to handler with rx buffer data */
+						(*driver->rx_handler)(driver->p_owner, driver->rx_buffer, driver->data_count);
+					}
+					else
+					{
+						/* Save data into rx buffer */
+						usart_rx_add_buffer(driver, data);
+					}
+				}
+			}
+		}
+	}
+	else
+	{
+		/* framing is disabled then callback to handler with 1 byte data */
+		(*driver->rx_handler)(driver->p_owner, &data, 1);
+	}
+}
+
 static void
 usart_irq_handler(usart_num num)
 {
@@ -185,12 +317,8 @@ usart_irq_handler(usart_num num)
 
 	if (usart->SR & USART_SR_RXNE)
 	{
-		usart_rx_buffer = (char)((usart_t *)driver->p_dev->reg)->DR;
-		(*driver->rx_handler)(driver->p_owner, usart_rx_buffer);
-	}
-	else if (usart->SR & USART_SR_TXE)
-	{
-		(*driver->tx_handler)(driver->p_owner);
+		uint08 data = (char)((usart_t *)driver->p_dev->reg)->DR;
+		usart_rx_irq_handler(driver, data);
 	}
 
 	CPU_ENTER_CRITICAL

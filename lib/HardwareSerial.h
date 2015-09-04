@@ -29,7 +29,7 @@ extern "C"
 
 /* Exported functions --------------------------------------------------------*/
 void
-rx_irq_callback(void *sender, char data);
+rx_irq_callback(void *sender, uint08 *data, uint08 len);
 void
 tx_irq_callback(void *sender);
 
@@ -82,12 +82,14 @@ public:
 		gpio_set_af(m_RxPin, usart_get_af(m_serial_no));
 		gpio_set_af(m_TxPin, usart_get_af(m_serial_no));
 
+		usart_frame_enable(m_serial_no, true);
+
 		usart_set_speed(m_serial_no, speed);
 	}
 
-	void OnRxInterrupt(char data)
+	void OnRxInterrupt(uint08 *data, uint08 len)
 	{
-		(void)data;
+		trace("Received: %d bytes => %s", len, data);
 	}
 
 	void OnTxInterrupt(void)

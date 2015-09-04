@@ -30,6 +30,7 @@ public:
 		/* Release current pin before initial new pin */
 		Release();
 
+		m_pin = pin;
 		m_pDev = gpio_init(pin);
 		if(m_pDev != NULL)
 		{

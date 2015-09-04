@@ -11,9 +11,9 @@
 #include <HardwareSerial.h>
 
 void
-rx_irq_callback(void *sender, char data)
+rx_irq_callback(void *sender, uint08 *data, uint08 len)
 {
-	((HardwareSerial *)sender)->OnRxInterrupt(data);
+	((HardwareSerial *)sender)->OnRxInterrupt(data, len);
 }
 
 void

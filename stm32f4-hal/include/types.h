@@ -20,15 +20,17 @@
 #include <defines.h>
 
 /* Exported types ------------------------------------------------------------*/
- typedef bool		boolean;
- typedef uint8_t	uint08;		/* Unsigned  8 bit quantity                           */
- typedef int8_t		sint08;		/* Signed    8 bit quantity                           */
- typedef uint16_t	uint16;		/* Unsigned 16 bit quantity                           */
- typedef int16_t	sint16;		/* Signed   16 bit quantity                           */
- typedef uint32_t	uint32;		/* Unsigned 32 bit quantity                           */
- typedef int32_t	sint32;		/* Signed   32 bit quantity                           */
- typedef float		float32;	/* Single precision floating point                    */
- typedef double		float64;	/* Double precision floating point                    */
+ typedef bool					boolean;
+ typedef unsigned 	char		uint08;		/* Unsigned  8 bit quantity                           */
+ typedef signed		char		sint08;		/* Signed    8 bit quantity                           */
+ typedef unsigned 	short		uint16;		/* Unsigned 16 bit quantity                           */
+ typedef signed		short		sint16;		/* Signed   16 bit quantity                           */
+ typedef unsigned 	long		uint32;		/* Unsigned 32 bit quantity                           */
+ typedef signed		long		sint32;		/* Signed   32 bit quantity                           */
+ typedef unsigned 	long long	uint64;		/* Unsigned 64 bit quantity                           */
+ typedef signed		long long	sint64;		/* Signed   64 bit quantity                           */
+ typedef float					float32;	/* Single precision floating point                    */
+ typedef double					float64;	/* Double precision floating point                    */
 
  typedef __io	uint32	reg32;
 

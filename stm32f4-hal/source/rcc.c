@@ -10,6 +10,17 @@
 
 #include <rcc.h>
 
+#define	RCC_CLK_CHANGE_TIMEOUT	5000
+
+
+#if !defined  (HSE_VALUE)
+  #define HSE_VALUE    ((uint32_t)8000000) /*!< Default value of the External oscillator in Hz */
+#endif /* HSE_VALUE */
+
+#if !defined  (HSI_VALUE)
+  #define HSI_VALUE    ((uint32_t)16000000) /*!< Value of the Internal oscillator in Hz*/
+#endif /* HSI_VALUE */
+
 #define RCC_DEV_ENTRY(bus, dev) \
     [RCC_##dev] = {.clk_bus = RCC_##bus, .mask = RCC_##bus##ENR_##dev##EN}
 
@@ -91,9 +102,27 @@ static volatile uint32	RCC_SysClock = 168000000;
 
 const uint8_t RCC_APBAHBPrescTable[16] = {0, 0, 0, 0, 1, 2, 3, 4, 1, 2, 3, 4, 6, 7, 8, 9};
 
-rcc_clk_bus
-rcc_dev_clk(rcc_clk_id id) {
-    return rcc_dev_table[id].clk_bus;
+/*
+ * **********************************************************
+ * Internal functions
+ * **********************************************************
+ */
+static inline __io uint32*
+rcc_clk_reg(rcc_clk clock)
+{
+    return (__io uint32*)(RCC_BASE + (clock >> RCC_CLK_BASE_OFF));
+}
+
+static inline uint32
+rcc_clk_on_mask(rcc_clk clock)
+{
+    return (1 << (clock & 0xFF));
+}
+
+static inline uint32
+rcc_clk_ready_mask(rcc_clk clock)
+{
+    return (rcc_clk_on_mask(clock) << 1);
 }
 
 static inline void
@@ -121,6 +150,86 @@ rcc_do_set_prescaler(const uint32 *masks, rcc_prescaler prescaler, uint32 divide
     cfgr &= ~masks[prescaler];
     cfgr |= divider;
     RCC_REG->CFGR = cfgr;
+}
+
+static inline boolean
+rcc_wait_clk_change(rcc_clk clock, boolean ready)
+{
+	uint32 counter = 0;
+	while(rcc_is_clk_ready(clock) != ready)
+	{
+		if(++counter > RCC_CLK_CHANGE_TIMEOUT)
+			return false;
+	}
+
+	return true;
+}
+
+/*
+ * **********************************************************
+ * Global functions
+ * **********************************************************
+ */
+rcc_clk_bus
+rcc_dev_clk(rcc_clk_id id)
+{
+    return rcc_dev_table[id].clk_bus;
+}
+
+boolean
+rcc_turn_on_clk(rcc_clk clock)
+{
+	/* Turn on clock */
+	*rcc_clk_reg(clock) |= rcc_clk_on_mask(clock);
+
+	/* Wait till clock ready */
+	return rcc_wait_clk_change(clock, true);
+}
+
+boolean
+rcc_turn_off_clk(rcc_clk clock)
+{
+	/* Turn off clock */
+	*rcc_clk_reg(clock) &= ~rcc_clk_on_mask(clock);
+
+	/* Wait till clock reset */
+	return rcc_wait_clk_change(clock, false);
+}
+
+boolean
+rcc_is_clk_on(rcc_clk clock)
+{
+    return !!(*rcc_clk_reg(clock) & rcc_clk_on_mask(clock));
+}
+
+boolean
+rcc_is_clk_ready(rcc_clk clock)
+{
+    return !!(*rcc_clk_reg(clock) & rcc_clk_ready_mask(clock));
+}
+
+void
+rcc_set_pllsrc(rcc_pllsrc pllsrc)
+{
+	CPU_MOD_REG(RCC_REG->PLLCFGR, RCC_PLLCFGR_PLLSRC, pllsrc);
+}
+
+void
+rcc_configure_pll(uint32 plln, uint32 pllm, uint32 pllp, uint32 pllq)
+{
+    uint32 pllcfgr;
+
+    /* Update RCC_PLLCFGR to reflect new values. */
+    pllcfgr = RCC_REG->PLLCFGR;
+    pllcfgr &= ~(RCC_PLLCFGR_PLLQ |
+                 RCC_PLLCFGR_PLLP |
+                 RCC_PLLCFGR_PLLN |
+                 RCC_PLLCFGR_PLLM );
+    pllcfgr |= ((pllq << CPU_POS_OF(RCC_PLLCFGR_PLLQ)) |
+    		(((pllp >> 1) - 1) << CPU_POS_OF(RCC_PLLCFGR_PLLP)) |
+			(plln << CPU_POS_OF(RCC_PLLCFGR_PLLN)) |
+			pllm);
+    RCC_REG->PLLCFGR = pllcfgr;
 }
 
 void rcc_clk_enable(rcc_clk_id id)
@@ -166,46 +275,26 @@ rcc_set_prescaler(rcc_prescaler prescaler, uint32 divider)
     rcc_do_set_prescaler(masks, prescaler, divider);
 }
 
-/* pll_cfg->data must point to a struct stm32f2_rcc_pll_data. */
-void
-rcc_configure_pll(rcc_pll_cfg *pll_cfg)
+boolean
+rcc_switch_sysclk(rcc_sysclk_src sysclk_src)
 {
-    rcc_pll_data *data = &pll_cfg->data;
-    uint32 pllcfgr;
+	uint32 counter = 0;
 
-    /* Check that the PLL is disabled. */
-    ASSERT_FAULT(!rcc_is_clk_on(RCC_CLK_PLL));
+	CPU_MOD_REG(RCC_REG->CFGR, RCC_CFGR_SW, sysclk_src);
 
-    /* Sanity-check all the parameters */
-    ASSERT_FAULT((data->pllq >= 4) && (data->pllq <= 15));
-    ASSERT_FAULT((data->pllp >= 2) && (data->pllp <= 8));
-    ASSERT_FAULT(!(data->pllp & 1));
-    ASSERT_FAULT((data->plln >= 192) && (data->plln <= 432));
-    ASSERT_FAULT((data->pllm >= 2) && (data->pllm <= 63));
+    /* Wait for new source to come into use. */
+    while (((RCC_REG->CFGR & RCC_CFGR_SWS) >> CPU_POS_OF(RCC_CFGR_SWS)) != sysclk_src)
+    {
+		if(++counter > RCC_CLK_CHANGE_TIMEOUT)
+			return false;
+    }
 
-    /* Update RCC_PLLCFGR to reflect new values. */
-    pllcfgr = RCC_REG->PLLCFGR;
-    pllcfgr &= ~(RCC_PLLCFGR_PLLQ |
-                 RCC_PLLCFGR_PLLP |
-                 RCC_PLLCFGR_PLLN |
-                 RCC_PLLCFGR_PLLM |
-                 RCC_PLLCFGR_PLLSRC);
-    pllcfgr |= (pll_cfg->pllsrc |
-                (data->pllq << 24) |
-                (((data->pllp >> 1) - 1) << 16) |
-                (data->plln << 6) |
-                data->pllm);
-    RCC_REG->PLLCFGR = pllcfgr;
-
-    /* Update clocks setting value */
-    RCC_SysClock	= (HSE_VALUE / data->pllm) * data->plln / data->pllp;
+	return true;
 }
 
-static inline uint32
+inline uint32
 rcc_get_sys_clk_freq(void)
 {
-	RCC_SysClock = SystemCoreClock;
-
 	return RCC_SysClock;
 }
 
@@ -230,4 +319,53 @@ rcc_get_clk_freq(rcc_clk_id id)
 	}
 
 	return (sys_clk >> pre);
+}
+
+void
+rcc_clk_update(void)
+{
+	  uint32_t tmp = 0, pllvco = 0, pllp = 2, pllsource = 0, pllm = 2;
+
+	  /* Get SYSCLK source -------------------------------------------------------*/
+	  tmp = RCC->CFGR & RCC_CFGR_SWS;
+
+	  switch (tmp)
+	  {
+	    case 0x00:  /* HSI used as system clock source */
+	    	RCC_SysClock = HSI_VALUE;
+	      break;
+	    case 0x04:  /* HSE used as system clock source */
+	    	RCC_SysClock = HSE_VALUE;
+	      break;
+	    case 0x08:  /* PLL used as system clock source */
+
+	      /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N
+	         SYSCLK = PLL_VCO / PLL_P
+	         */
+	      pllsource = (RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) >> 22;
+	      pllm = RCC->PLLCFGR & RCC_PLLCFGR_PLLM;
+
+	      if (pllsource != 0)
+	      {
+	        /* HSE used as PLL clock source */
+	        pllvco = (HSE_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+	      }
+	      else
+	      {
+	        /* HSI used as PLL clock source */
+	        pllvco = (HSI_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+	      }
+
+	      pllp = (((RCC->PLLCFGR & RCC_PLLCFGR_PLLP) >>16) + 1 ) *2;
+	      RCC_SysClock = pllvco/pllp;
+	      break;
+	    default:
+	    	RCC_SysClock = HSI_VALUE;
+	      break;
+	  }
+	  /* Compute HCLK frequency --------------------------------------------------*/
+	  /* Get HCLK prescaler */
+	  tmp = RCC_APBAHBPrescTable[((RCC->CFGR & RCC_CFGR_HPRE) >> 4)];
+	  /* HCLK frequency */
+	  RCC_SysClock >>= tmp;
 }

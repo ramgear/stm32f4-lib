@@ -22,10 +22,15 @@
 #include <nvic.h>
 #include <gpio.h>
 
-/* Exported types ------------------------------------------------------------*/
-typedef USART_TypeDef	usart_t;
+#define	USART_BUFFER_SIZE		64
+#define	USART_FRAME_STX			0x02
+#define	USART_FRAME_ETX			0x03
+#define	USART_FRAME_ESC			0x1B
 
 #define	USART_NUM_MAX	6
+
+/* Exported types ------------------------------------------------------------*/
+typedef USART_TypeDef	usart_t;
 
 typedef enum usart_num
 {
@@ -38,7 +43,7 @@ typedef enum usart_num
 	SERIAL_INVALID,
 } usart_num;
 
-typedef	void (*usart_rx_handler)(void *sender, char data);
+typedef	void (*usart_rx_handler)(void *sender, uint08 *data, uint08 len);
 typedef	void (*usart_tx_handler)(void *sender);
 
 /**********************************************************************************
@@ -62,6 +67,12 @@ usart_set_speed(usart_num num, uint32 speed);
 
 gpio_af
 usart_get_af(usart_num num);
+
+void
+usart_frame_enable(usart_num num, boolean enable);
+
+void
+usart_frame_config(usart_num num, uint08 stx, uint08 etx, uint08 esc);
 
 void
 usart_set_rx_handler(usart_num num, usart_rx_handler handler);

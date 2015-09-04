@@ -296,7 +296,7 @@ gpio_set_af(const gpio_pin_dev *dev, gpio_af af)
 {
     gpio_reg *regs = gpio_get_reg(dev->port);
 
-    __set_reg_val(&regs->AFR[dev->pin >> 3], dev->pin % 8, 0xF, af);
+    __set_reg_val(&regs->AFR[dev->pin >> 3], (dev->pin % 8) * 4, 0xF, af);
 }
 
 void

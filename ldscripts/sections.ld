@@ -46,7 +46,7 @@ PROVIDE ( _Heap_Limit = __stack - __Main_Stack_Size ) ;
  * The entry point is informative, for debuggers and simulators,
  * since the Cortex-M vector points to it anyway.
  */
-ENTRY(_start)
+ENTRY(CPU_Startup)
 
 
 /* Sections Definitions */

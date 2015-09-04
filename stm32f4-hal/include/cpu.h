@@ -32,8 +32,12 @@
 /* Exported macro ------------------------------------------------------------*/
 #define CPU_INL_FUNC	__attribute__((always_inline)) static inline
 
-#define	CPU_POS_OF(mask)		(CPU_CTZ(mask))
-#define	CPU_MOD_VAL(val,mask)	(((val) << CPU_CTZ(mask)) & mask)
+#define	CPU_POS_OF(mask)			(CPU_CTZ(mask))
+#define	CPU_MOD_VAL(val,mask)		(((val) << CPU_POS_OF(mask)) & mask)
+#define	CPU_MOD_REG(reg,mask,val)	((reg) = (((reg) & ~(mask)) | ((val) << CPU_POS_OF(mask))))
+
+#define CPU_SET_BIT(reg,mask)		((reg) |= (mask))
+#define CPU_CLR_BIT(reg,mask)		((reg) &= ~(mask))
 
 #define	CPU_SR_ALLOC			uint32 __primask;
 #define	CPU_ENTER_CRITICAL		\
@@ -315,6 +319,9 @@
 
 	  return(data);
  }
+
+ void
+ cpu_init(void);
 
 #ifdef __cplusplus
 }

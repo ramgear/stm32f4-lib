@@ -27,9 +27,9 @@ class SystemTick
 {
 public:
 	static inline void
-	SetFrequency(uint32 freq_hz)
+	Init(void)
 	{
-		systick_init(freq_hz);
+		systick_init();
 	}
 
 	static inline void

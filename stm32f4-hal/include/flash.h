@@ -1,16 +1,16 @@
 /**
  ******************************************************************************
- * @file	pwr_reg.h
+ * @file	flash.h
  * @author	Eakkasit L.
  * @version	V1.0.0
- * @date	28-Aug-2015
+ * @date	04-Sep-2015
  * @brief	Brief of file description
  ******************************************************************************
  */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef INCLUDE_REGISTERS_PWR_REG_H_
-#define INCLUDE_REGISTERS_PWR_REG_H_
+#ifndef FLASH_H_
+#define FLASH_H_
 
 #ifdef __cplusplus
  extern "C" {
@@ -20,33 +20,34 @@
 #include <cpu.h>
 
 /* Exported types ------------------------------------------------------------*/
+ typedef FLASH_TypeDef flash_t;
 
- /**
-   * @brief Power Control
-   */
-
- typedef PWR_TypeDef pwr_t;
+ typedef enum flash_opt
+ {
+	 FLASH_OPT_PREFETCH_BUFFER	= FLASH_ACR_PRFTEN,
+	 FLASH_OPT_INS_CACHE		= FLASH_ACR_ICEN,
+	 FLASH_OPT_DATA_CACHE		= FLASH_ACR_DCEN,
+ } flash_opt;
 
 /* Exported constants --------------------------------------------------------*/
-
-#define PWR_REG			((pwr_t	*)PWR_BASE)   /*!< Power configuration struct           */
+#define FLASH_REG			((flash_t	*)FLASH_R_BASE)
 
 /* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions --------------------------------------------------------*/
 void
-pwr_init(void);
+flash_opt_enable(flash_opt opt);
 
 void
-pwr_enable(void);
+flash_opt_disable(flash_opt opt);
 
 void
-pwr_set_vos(uint32 vos);
+flash_set_latency(uint32 latency);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* INCLUDE_REGISTERS_PWR_REG_H_ */
+#endif /* FLASH_H_ */
 
 /*****************************END OF FILE**************************************/

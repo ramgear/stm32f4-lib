@@ -15,12 +15,14 @@
 #include <nvic.h>
 
 irq_callback_t SysTickCallback;
-static volatile uint32	system_ticks;
+
+volatile uint32 systick_milli;
+uint32 systick_us_per_count;
 
 void
-systick_init(uint32 freq_hz)
+systick_init(void)
 {
-	uint32 ticks = SystemCoreClock  / freq_hz - 1;
+	uint32 ticks = rcc_get_sys_clk_freq()  / 999;	/* Fixed systick to 1ms */
 
 	if(ticks > SYSTICK_LOAD_RELOAD_MSK)
 		return;	/* Impossible reload value */
@@ -30,7 +32,8 @@ systick_init(uint32 freq_hz)
 	SYSTICK_REG->LOAD	= ticks;	/* set reload register */
 	SYSTICK_REG->VAL	= 0;
 	SYSTICK_REG->CTRL	= SYSTICK_CTRL_CLKSOURCE_MSK | SYSTICK_CTRL_TICKINT_MSK | SYSTICK_CTRL_ENABLE_MSK;
-	system_ticks = 0;
+	systick_milli = 0;
+	systick_us_per_count = rcc_get_sys_clk_freq() / 1000000;
 }
 
 void
@@ -52,9 +55,30 @@ systick_set_callback(irq_callback_t cb)
 }
 
 void
+systick_delay_ms(uint32 ms)
+{
+	uint32 end_ms = systick_milli + ms;
+	while(systick_milli < end_ms)
+		;
+}
+
+void
+systick_delay_us(uint32 us)
+{
+	uint32 end_us = systick_get_micro() + us;
+	while(systick_get_micro() < end_us)
+		;
+}
+
+void
 SysTick_Handler(void)
 {
+	CPU_SR_ALLOC
+	CPU_ENTER_CRITICAL
+	++systick_milli;
+	CPU_EXIT_CRITICAL
+
 	if(SysTickCallback != NULL)
-		(*SysTickCallback)((void *)&system_ticks);
+		(*SysTickCallback)((void *)&systick_milli);
 }
 
