@@ -51,8 +51,6 @@
 
 /* Exported constants --------------------------------------------------------*/
 
-#define SCB_REG			((scb_t	*)SCB_BASE)		/*!< SCB configuration struct           */
-
  /* SCB CPUID Register Definitions */
  #define SCB_CPUID_IMPLEMENTER_POS          24                                             /*!< SCB CPUID: IMPLEMENTER Position */
  #define SCB_CPUID_IMPLEMENTER_MSK          (0xFFUL << SCB_CPUID_IMPLEMENTER_POS)          /*!< SCB CPUID: IMPLEMENTER Mask */

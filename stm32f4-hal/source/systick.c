@@ -16,24 +16,27 @@
 
 irq_callback_t SysTickCallback;
 
-volatile uint32 systick_milli;
+volatile uint32 systick_ticks;
 uint32 systick_us_per_count;
+uint32 systick_us_per_tick;
+uint32 systick_count_per_us;
 
 void
 systick_init(void)
 {
-	uint32 ticks = rcc_get_sys_clk_freq()  / 999;	/* Fixed systick to 1ms */
+	uint32 ticks = RCC_SYSTEM_CLOCK  / SYSTICK_FREQ_HZ - 1;	/* Fixed systick to 1ms */
 
 	if(ticks > SYSTICK_LOAD_RELOAD_MSK)
 		return;	/* Impossible reload value */
 
-	nvic_set_irq_priority(SysTick_IRQn, 0xF);		/* Set lowest priority */
+	nvic_set_irq_priority(SysTick_IRQn, 0);		/* Set highest priority */
 
 	SYSTICK_REG->LOAD	= ticks;	/* set reload register */
 	SYSTICK_REG->VAL	= 0;
 	SYSTICK_REG->CTRL	= SYSTICK_CTRL_CLKSOURCE_MSK | SYSTICK_CTRL_TICKINT_MSK | SYSTICK_CTRL_ENABLE_MSK;
-	systick_milli = 0;
-	systick_us_per_count = rcc_get_sys_clk_freq() / 1000000;
+	systick_ticks = 0;
+	systick_us_per_tick	= 1000000 / SYSTICK_FREQ_HZ;
+	systick_count_per_us = RCC_SYSTEM_CLOCK / 1000000;
 }
 
 void
@@ -57,8 +60,8 @@ systick_set_callback(irq_callback_t cb)
 void
 systick_delay_ms(uint32 ms)
 {
-	uint32 end_ms = systick_milli + ms;
-	while(systick_milli < end_ms)
+	uint32 end_ms = systick_get_milli() + ms;
+	while(systick_get_milli() < end_ms)
 		;
 }
 
@@ -71,14 +74,11 @@ systick_delay_us(uint32 us)
 }
 
 void
-SysTick_Handler(void)
+ISR_SysTick_Handler(void)
 {
-	CPU_SR_ALLOC
-	CPU_ENTER_CRITICAL
-	++systick_milli;
-	CPU_EXIT_CRITICAL
+	++systick_ticks;
 
 	if(SysTickCallback != NULL)
-		(*SysTickCallback)((void *)&systick_milli);
+		(*SysTickCallback)((void *)&systick_ticks);
 }
 

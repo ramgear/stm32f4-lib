@@ -124,32 +124,32 @@ exti_irq_handler(exti_num num)
 	EXTI_REG->PR |= (1 << num);
 }
 
-void EXTI0_IRQHandler(void)
+void ISR_EXTI0_IRQHandler(void)
 {
 	exti_irq_handler(EXTI_0);
 }
 
-void EXTI1_IRQHandler(void)
+void ISR_EXTI1_IRQHandler(void)
 {
 	exti_irq_handler(EXTI_1);
 }
 
-void EXTI2_IRQHandler(void)
+void ISR_EXTI2_IRQHandler(void)
 {
 	exti_irq_handler(EXTI_2);
 }
 
-void EXTI3_IRQHandler(void)
+void ISR_EXTI3_IRQHandler(void)
 {
 	exti_irq_handler(EXTI_3);
 }
 
-void EXTI4_IRQHandler(void)
+void ISR_EXTI4_IRQHandler(void)
 {
 	exti_irq_handler(EXTI_4);
 }
 
-void EXTI9_5_IRQHandler(void)
+void ISR_EXTI9_5_IRQHandler(void)
 {
 	uint32 pr = EXTI_REG->PR;
 
@@ -165,7 +165,7 @@ void EXTI9_5_IRQHandler(void)
 		exti_irq_handler(EXTI_9);
 }
 
-void EXTI15_10_IRQHandler(void)
+void ISR_EXTI15_10_IRQHandler(void)
 {
 	uint32 pr = EXTI_REG->PR;
 

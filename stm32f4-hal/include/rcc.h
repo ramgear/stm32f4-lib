@@ -28,6 +28,8 @@
 
 #define RCC_CLK_BASE_OFF		8
 
+#define RCC_SYSTEM_CLOCK		rcc_sys_clk_freq
+
 /* Exported types ------------------------------------------------------------*/
  /**
    * @brief Reset and Clock Control
@@ -282,6 +284,9 @@ rcc_get_clk_freq(rcc_clk_id id);
 void
 rcc_clk_update(void);
 
+void
+rcc_reset(void);
+
 /**
  * @brief Enable the clock security system (CSS).
  */
@@ -299,6 +304,8 @@ rcc_disable_css(void)
 {
 	RCC_REG->CR &= ~RCC_CR_CSSON;
 }
+
+extern	uint32 rcc_sys_clk_freq;
 
 #ifdef __cplusplus
 }

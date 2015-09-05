@@ -13,7 +13,7 @@
 #include <errno.h>
 
 #include "cpu.h"
-#include "diag/Trace.h"
+#include "trace.h"
 
 
 /*
@@ -124,10 +124,8 @@ void CPU_Startup(void)
 {
 	int ret;
 
-	SystemInit();
-
-	/* Call CPU initialization */
-	cpu_init();
+	/* Call CPU early initialization */
+	cpu_init_early();
 
 	/* Copy the initialized data from ROM to RAM. */
 	CPU_DataInit(&__SIDATA__, &__SDATA__, &__EDATA__);
@@ -137,6 +135,9 @@ void CPU_Startup(void)
 
 	/* C++ execute the constructors for the static objects */
 	CPU_InitArray();
+
+	/* Call CPU initialization */
+	cpu_init();
 
 	/* Call main function */
 	ret = main();
@@ -157,7 +158,7 @@ void CPU_Startup(void)
  */
 __attribute__ ((section(".after_vectors"),noreturn))
 void
-Reset_Handler(void)
+ISR_Reset_Handler(void)
 {
 	 CPU_Startup();
 }

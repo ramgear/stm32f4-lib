@@ -98,7 +98,7 @@ rcc_dev_info rcc_dev_table[] =
 	    RCC_DEV_ENTRY(APB2, TIM1),
 };
 
-static volatile uint32	RCC_SysClock = 168000000;
+uint32	rcc_sys_clk_freq = 168000000;
 
 const uint8_t RCC_APBAHBPrescTable[16] = {0, 0, 0, 0, 1, 2, 3, 4, 1, 2, 3, 4, 6, 7, 8, 9};
 
@@ -295,14 +295,14 @@ rcc_switch_sysclk(rcc_sysclk_src sysclk_src)
 inline uint32
 rcc_get_sys_clk_freq(void)
 {
-	return RCC_SysClock;
+	return rcc_sys_clk_freq;
 }
 
 uint32
 rcc_get_clk_freq(rcc_clk_id id)
 {
 	rcc_clk_bus clk_bus = rcc_dev_clk(id);
-	uint32	sys_clk = rcc_get_sys_clk_freq();
+	uint32	sys_clk = RCC_SYSTEM_CLOCK;
 	uint32	pre = 0;
 
 	switch(clk_bus)
@@ -327,45 +327,69 @@ rcc_clk_update(void)
 	  uint32_t tmp = 0, pllvco = 0, pllp = 2, pllsource = 0, pllm = 2;
 
 	  /* Get SYSCLK source -------------------------------------------------------*/
-	  tmp = RCC->CFGR & RCC_CFGR_SWS;
+	  tmp = RCC_REG->CFGR & RCC_CFGR_SWS;
 
 	  switch (tmp)
 	  {
 	    case 0x00:  /* HSI used as system clock source */
-	    	RCC_SysClock = HSI_VALUE;
+	    	rcc_sys_clk_freq = HSI_VALUE;
 	      break;
 	    case 0x04:  /* HSE used as system clock source */
-	    	RCC_SysClock = HSE_VALUE;
+	    	rcc_sys_clk_freq = HSE_VALUE;
 	      break;
 	    case 0x08:  /* PLL used as system clock source */
 
 	      /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N
 	         SYSCLK = PLL_VCO / PLL_P
 	         */
-	      pllsource = (RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) >> 22;
-	      pllm = RCC->PLLCFGR & RCC_PLLCFGR_PLLM;
+	      pllsource = (RCC_REG->PLLCFGR & RCC_PLLCFGR_PLLSRC) >> 22;
+	      pllm = RCC_REG->PLLCFGR & RCC_PLLCFGR_PLLM;
 
 	      if (pllsource != 0)
 	      {
 	        /* HSE used as PLL clock source */
-	        pllvco = (HSE_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+	        pllvco = (HSE_VALUE / pllm) * ((RCC_REG->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
 	      }
 	      else
 	      {
 	        /* HSI used as PLL clock source */
-	        pllvco = (HSI_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+	        pllvco = (HSI_VALUE / pllm) * ((RCC_REG->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
 	      }
 
-	      pllp = (((RCC->PLLCFGR & RCC_PLLCFGR_PLLP) >>16) + 1 ) *2;
-	      RCC_SysClock = pllvco/pllp;
+	      pllp = (((RCC_REG->PLLCFGR & RCC_PLLCFGR_PLLP) >>16) + 1 ) *2;
+	      rcc_sys_clk_freq = pllvco/pllp;
 	      break;
 	    default:
-	    	RCC_SysClock = HSI_VALUE;
+	    	rcc_sys_clk_freq = HSI_VALUE;
 	      break;
 	  }
 	  /* Compute HCLK frequency --------------------------------------------------*/
 	  /* Get HCLK prescaler */
-	  tmp = RCC_APBAHBPrescTable[((RCC->CFGR & RCC_CFGR_HPRE) >> 4)];
+	  tmp = RCC_APBAHBPrescTable[((RCC_REG->CFGR & RCC_CFGR_HPRE) >> 4)];
 	  /* HCLK frequency */
-	  RCC_SysClock >>= tmp;
+	  rcc_sys_clk_freq >>= tmp;
+}
+
+void
+rcc_reset(void)
+{
+	/* Reset the RCC clock configuration to the default reset state */
+
+	/* turn on HSI*/
+	rcc_turn_on_clk(RCC_CLK_HSI);
+
+	/* Reset CFGR register */
+	RCC_REG->CFGR = 0x00000000;
+
+	/* Reset HSEON, CSSON and PLLON bits */
+	RCC_REG->CR &= (uint32_t)0xFEF6FFFF;
+
+	/* Reset PLLCFGR register */
+	RCC_REG->PLLCFGR = 0x24003010;
+
+	/* Reset HSEBYP bit */
+	RCC_REG->CR &= (uint32_t)0xFFFBFFFF;
+
+	/* Disable all interrupts */
+	RCC_REG->CIR = 0x00000000;
 }

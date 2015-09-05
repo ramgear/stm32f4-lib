@@ -14,7 +14,7 @@
 	[SERIAL##NUM]	=	{ .reg = U##AS##RT##NUM##_BASE, .clk_id = RCC_U##AS##RT##NUM, .irq = U##AS##RT##NUM##_IRQn }
 
 #define	USART_ISR(NUM,AS)	\
-		void U##AS##RT##NUM##_IRQHandler(void)
+		void ISR_U##AS##RT##NUM##_IRQHandler(void)
 
 #define	USART_FLAG_SET			1
 #define	USART_FLAG_RESET		0

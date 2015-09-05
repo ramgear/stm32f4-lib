@@ -18,7 +18,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <core/nvic.h>
-#include <core/scb.h>
+#include <scb.h>
 
 /* Exported types ------------------------------------------------------------*/
 typedef IRQn_Type nvic_irq_num;

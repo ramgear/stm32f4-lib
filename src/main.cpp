@@ -7,11 +7,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "diag/Trace.h"
+#include "trace.h"
 #include <OutputPin.h>
 #include <InputPin.h>
-#include <SystemTick.h>
 #include <HardwareSerial.h>
+#include <Delay.h>
 
 // ----------------------------------------------------------------------------
 //
@@ -58,19 +58,16 @@ main(int argc, char* argv[])
 	btn = PB0;
 	btn.AttachInterrupt(btn_irq_handler);
 
-	SystemTick::Init();
-	SystemTick::Start();
-
 	serail1.Begin(9600);
 
-	trace("RCC Clock: %d\n", rcc_get_sys_clk_freq());
+	trace("RCC Clock: %d\n", RCC_SYSTEM_CLOCK);
 
   // Infinite loop
   while (1)
     {
        // Add your code here.
 	  led4 = !led4;
-	  __delay_us(500000);
+	  Delay::Milli(500);
     }
 }
 

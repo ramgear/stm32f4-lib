@@ -321,6 +321,9 @@
  }
 
  void
+ cpu_init_early(void);
+
+ void
  cpu_init(void);
 
 #ifdef __cplusplus

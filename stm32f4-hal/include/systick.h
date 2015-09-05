@@ -27,6 +27,8 @@
 #define	__delay_ms			systick_delay_ms
 #define	__delay_us			systick_delay_us
 
+#define	SYSTICK_FREQ_HZ		100
+
 typedef union system_time
 {
 	uint16	microsecond;
@@ -37,23 +39,20 @@ typedef union system_time
 	uint08	date;
 } system_time;
 
-extern volatile uint32 systick_milli;
-extern uint32 systick_us_per_count;
+extern volatile uint32 systick_ticks;
+extern uint32 systick_us_per_tick;
+extern uint32 systick_count_per_us;
 
 CPU_INL_FUNC
 uint32 systick_get_micro(void)
 {
-	uint32 val;
-	uint32 micro;
+	return (systick_ticks * systick_us_per_tick + (((SYSTICK_REG->LOAD + 1) - SYSTICK_REG->VAL) / systick_count_per_us));
+}
 
-	CPU_SR_ALLOC
-	CPU_ENTER_CRITICAL
-	val = (uint32)SYSTICK_REG->VAL;
-	CPU_EXIT_CRITICAL
-
-	micro = systick_milli * 1000 + (1000 - val / systick_us_per_count);
-
-	return micro;
+CPU_INL_FUNC
+uint32 systick_get_milli(void)
+{
+	return (systick_get_micro() / 1000);
 }
 
 void
