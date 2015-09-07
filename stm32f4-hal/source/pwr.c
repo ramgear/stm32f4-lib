@@ -27,6 +27,6 @@ pwr_enable(void)
 void
 pwr_set_vos(uint32 vos)
 {
-	PWR_REG->CR |= CPU_MOD_VAL(vos, PWR_CR_VOS);
+	PWR_REG->CR |= CPU_MOD_VAL(PWR_CR_VOS, vos);
 }
 

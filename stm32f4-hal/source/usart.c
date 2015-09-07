@@ -172,7 +172,7 @@ usart_set_speed(usart_num num, uint32 baudrate)
 
 	mantissa 	= (uint16)divider;
 	fraction 	= (uint08)((divider - mantissa) * sampling);
-	usart->BRR 	= CPU_MOD_VAL(mantissa, USART_BRR_DIV_Mantissa) | CPU_MOD_VAL(fraction, USART_BRR_DIV_Fraction);
+	usart->BRR 	= CPU_MOD_VAL(USART_BRR_DIV_Mantissa, mantissa) | CPU_MOD_VAL(USART_BRR_DIV_Fraction, fraction);
 }
 
 gpio_af

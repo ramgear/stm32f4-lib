@@ -33,8 +33,9 @@
 #define CPU_INL_FUNC	__attribute__((always_inline)) static inline
 
 #define	CPU_POS_OF(mask)			(CPU_CTZ(mask))
-#define	CPU_MOD_VAL(val,mask)		(((val) << CPU_POS_OF(mask)) & mask)
+#define	CPU_MOD_VAL(mask,val)		(((val) << CPU_POS_OF(mask)) & mask)
 #define	CPU_MOD_REG(reg,mask,val)	((reg) = (((reg) & ~(mask)) | ((val) << CPU_POS_OF(mask))))
+#define	CPU_GET_VAL(reg,mask)		(((reg) & (mask)) >> CPU_POS_OF(mask))
 
 #define CPU_SET_BIT(reg,mask)		((reg) |= (mask))
 #define CPU_CLR_BIT(reg,mask)		((reg) &= ~(mask))
