@@ -43,6 +43,9 @@ pwr_enable(void);
 void
 pwr_set_vos(uint32 vos);
 
+void
+pwr_bkpsram_enable(void);
+
 #ifdef __cplusplus
 }
 #endif
