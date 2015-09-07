@@ -18,7 +18,15 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <types.h>
+#if defined(STM32F407xx)
 #include <stm32f407xx.h>
+#elif defined(STM32f401xx)
+#include <stm32f401xx.h>
+#elif defined(STM32f429xx)
+#include <stm32f429xx.h>
+#else
+#error "Please define CPU to use this libraries!"
+#endif
 
 /* Exported types ------------------------------------------------------------*/
 
