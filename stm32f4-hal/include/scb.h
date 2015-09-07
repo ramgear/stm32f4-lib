@@ -28,6 +28,9 @@ scb_init(void);
 void
 scb_set_vector(uint32 addr);
 
+void
+scb_reset(void);
+
 #ifdef __cplusplus
 }
 #endif

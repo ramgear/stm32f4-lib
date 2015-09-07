@@ -112,7 +112,7 @@
  CPU_INL_FUNC
  void CPU_ISB(void)
  {
-	 __asm volatile ("DSB");
+	 __asm volatile ("ISB");
  }
 
  /**

@@ -11,6 +11,7 @@
  */
 
 #include <scb.h>
+#include <bkpsram.h>
 
 void
 scb_init(void)
@@ -27,4 +28,17 @@ scb_set_vector(uint32 addr)
 	SCB_REG->VTOR = addr;
 }
 
+
+void
+scb_reset(void)
+{
+	CPU_DSB();
+	SCB_REG->AIRCR =	((0x5FA << SCB_AIRCR_VECTKEY_POS)      |
+            			(SCB_REG->AIRCR & SCB_AIRCR_PRIGROUP_MSK) |
+						SCB_AIRCR_SYSRESETREQ_MSK);                   /* Keep priority group unchanged */
+	CPU_DSB();
+
+	/* wait until reset */
+	while(1);
+}
 
