@@ -13,6 +13,7 @@
 
 #include <exti.h>
 #include <nvic.h>
+#include <syscfg.h>
 
 typedef struct exti_dev
 {
@@ -50,8 +51,9 @@ exti_dev exti_dev_table[] =
 exti_driver	exti_handlers[EXTI_NUM];
 
 void
-exti_set_owner(exti_num num, void *owner)
+exti_set_owner(exti_num num, const gpio_pin_dev	*dev, void *owner)
 {
+	exti_handlers[num].p_dev = dev;
 	exti_handlers[num].p_owner = owner;
 }
 
@@ -73,7 +75,20 @@ exti_release(exti_num num)
 void
 exti_enable(exti_num num)
 {
+	static boolean is_init_syscfg = false;
+
 	EXTI_REG->IMR |= (1 << num);
+
+	if(!is_init_syscfg)
+	{
+		syscfg_init();
+		is_init_syscfg = true;
+	}
+
+	if(exti_handlers[num].p_dev != NULL)
+	{
+		syscfg_set_exti(num, exti_handlers[num].p_dev->port);
+	}
 
 	nvic_irq_enable(exti_dev_table[num].irq);
 }
@@ -85,17 +100,17 @@ exti_disable(exti_num num)
 
 	if(num < EXTI_5)
 	{
-		nvic_irq_enable(exti_dev_table[num].irq);
+		nvic_irq_disable(exti_dev_table[num].irq);
 	}
 	else if(num < EXTI_10)
 	{
 		if((EXTI_REG->IMR & (0x1F << 5)) == 0)
-			nvic_irq_enable(exti_dev_table[num].irq);
+			nvic_irq_disable(exti_dev_table[num].irq);
 	}
 	else
 	{
 		if((EXTI_REG->IMR & (0x3F << 10)) == 0)
-			nvic_irq_enable(exti_dev_table[num].irq);
+			nvic_irq_disable(exti_dev_table[num].irq);
 	}
 }
 

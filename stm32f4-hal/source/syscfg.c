@@ -12,9 +12,16 @@
 
 
 #include <syscfg.h>
+#include <rcc.h>
+
+void
+syscfg_init(void)
+{
+	rcc_clk_enable(RCC_SYSCFG);
+}
 
 void
 syscfg_set_exti(exti_num num, gpio_port port)
 {
-    __set_reg_val(&SYSCFG_REG->EXTICR[num >> 2], (num % 4) * 4, 0xF, port);
+	CPU_MOD_REG(SYSCFG_REG->EXTICR[num >> 2], 0xF << ((num % 4) * 4), port);
 }

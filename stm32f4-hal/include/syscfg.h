@@ -25,6 +25,9 @@ typedef SYSCFG_TypeDef	syscfg_t;
 #define SYSCFG_REG	((syscfg_t *)SYSCFG_BASE)
 
 void
+syscfg_init(void);
+
+void
 syscfg_set_exti(exti_num num, gpio_port port);
 
 #ifdef __cplusplus

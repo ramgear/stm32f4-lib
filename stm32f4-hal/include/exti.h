@@ -53,7 +53,7 @@ typedef enum exti_trigger
 } exti_trigger;
 
 void
-exti_set_owner(exti_num num, void *owner);
+exti_set_owner(exti_num num, const gpio_pin_dev *dev, void *owner);
 
 boolean
 exti_available(exti_num num);

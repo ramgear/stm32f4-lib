@@ -14,7 +14,7 @@
 #define LIB_INPUTPIN_H_
 
 #include <IOPin.h>
-#include <syscfg.h>
+#include <exti.h>
 
 /**
  * @brief	
@@ -90,9 +90,7 @@ public:
 			return;
 		}
 
-		syscfg_set_exti(exti, m_pDev->port);
-
-		exti_set_owner(exti, this);
+		exti_set_owner(exti, m_pDev, this);
 		exti_set_trigger(exti, trigger);
 		exti_set_callback(exti, cb);
 		if(enable)
