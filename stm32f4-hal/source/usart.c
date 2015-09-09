@@ -221,6 +221,18 @@ usart_set_tx_handler(usart_num num, usart_tx_handler handler)
 	usart_drivers[num].tx_handler = handler;
 }
 
+void
+usart_send(usart_num num, const uint08 data)
+{
+	usart_driver *driver = &usart_drivers[num];
+	usart_t		*reg = (usart_t *)driver->p_dev->reg;
+
+	/* Wait till tx is empty */
+	while(!(reg->SR & USART_SR_TXE));
+
+	reg->DR = data;
+}
+
 static inline void
 usart_rx_add_buffer(usart_driver *driver, uint08 data)
 {
@@ -319,6 +331,10 @@ usart_irq_handler(usart_num num)
 	{
 		uint08 data = (char)((usart_t *)driver->p_dev->reg)->DR;
 		usart_rx_irq_handler(driver, data);
+	}
+	if (usart->SR & USART_SR_TC)
+	{
+		(*driver->tx_handler)(driver->p_owner);
 	}
 
 	CPU_ENTER_CRITICAL

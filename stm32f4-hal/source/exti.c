@@ -132,11 +132,15 @@ exti_irq_handler(exti_num num)
 {
 	exti_driver *driver = &exti_handlers[num];
 
-	if(driver != NULL && driver->irq_handler != NULL)
-		(*(driver->irq_handler))(driver->p_owner);
+	EXTI_REG->IMR &= ~(1 << num);
 
 	/* Clear pending flag by write 1 to pending flag*/
 	EXTI_REG->PR |= (1 << num);
+
+	if(driver != NULL && driver->irq_handler != NULL)
+		(*(driver->irq_handler))(driver->p_owner);
+
+	EXTI_REG->IMR |= (1 << num);
 }
 
 void ISR_EXTI0_IRQHandler(void)

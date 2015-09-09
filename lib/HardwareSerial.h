@@ -13,6 +13,7 @@
 #define HARDWARESERIAL_H_
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdarg.h>
 #include <usart.h>
 #include <AlternatePin.h>
 
@@ -38,13 +39,19 @@ class HardwareSerial
 protected:
 	usart_num		m_serial_no;
 
+	char			tx_buffer[USART_BUFFER_SIZE];
+	char			rx_buffer[USART_BUFFER_SIZE];
+	uint32			rx_index;
+	bool			tx_ready;
+	bool			RxReceived;
+
 public:
 	AlternatePin	m_RxPin;
 	AlternatePin	m_TxPin;
 
 public:
 	HardwareSerial()
-	: m_serial_no(SERIAL_INVALID)
+	: m_serial_no(SERIAL_INVALID), rx_index(0), tx_ready(false), RxReceived(false)
 	{
 
 	}
@@ -69,7 +76,7 @@ public:
 		return *this;
 	}
 
-	void
+	virtual void
 	Begin(uint32 speed)
 	{
 		if(m_RxPin == INVALID_PIN || m_TxPin == INVALID_PIN)
@@ -82,19 +89,56 @@ public:
 		gpio_set_af(m_RxPin, usart_get_af(m_serial_no));
 		gpio_set_af(m_TxPin, usart_get_af(m_serial_no));
 
-		usart_frame_enable(m_serial_no, true);
+		//usart_frame_enable(m_serial_no, true);
 
 		usart_set_speed(m_serial_no, speed);
 	}
 
+	virtual void
+	Send(const char *format, ...)
+	{
+		int ret;
+		  va_list ap;
+		  uint08	*ptr;
+
+		  va_start (ap, format);
+
+		  // Print to the local buffer
+		  ret = vsnprintf (tx_buffer, sizeof(tx_buffer), format, ap);
+		  if (ret > 0)
+		    {
+			  //trace("Send: %s", tx_buffer);
+
+			  ptr = (uint08 *)tx_buffer;
+			  tx_ready = true;
+			  while(ret--)
+			  {
+				  while(!tx_ready);
+				  usart_send(m_serial_no, *ptr++);
+			  }
+		    }
+
+		  va_end (ap);
+	}
+
 	void OnRxInterrupt(uint08 *data, uint08 len)
 	{
-		trace("Received: %d bytes => %s", len, data);
+		(void)len;
+
+		rx_buffer[rx_index++] = *data;
+
+		if(*data == '\n')
+		{
+			rx_buffer[rx_index] = 0;
+			rx_index = 0;
+
+			RxReceived = true;
+		}
 	}
 
 	void OnTxInterrupt(void)
 	{
-
+		tx_ready = true;
 	}
 };
 

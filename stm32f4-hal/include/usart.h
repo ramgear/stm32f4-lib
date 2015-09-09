@@ -80,6 +80,9 @@ usart_set_rx_handler(usart_num num, usart_rx_handler handler);
 void
 usart_set_tx_handler(usart_num num, usart_tx_handler handler);
 
+void
+usart_send(usart_num num, const uint08 data);
+
 #ifdef __cplusplus
 }
 #endif

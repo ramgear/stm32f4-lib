@@ -10,8 +10,9 @@
 #include "trace.h"
 #include <OutputPin.h>
 #include <InputPin.h>
-#include <HardwareSerial.h>
-#include <Delay.h>
+#include <HC05Bluetooth.h>
+
+#include <bkpsram.h>
 
 // ----------------------------------------------------------------------------
 //
@@ -33,50 +34,51 @@
 #pragma GCC diagnostic ignored "-Wmissing-declarations"
 #pragma GCC diagnostic ignored "-Wreturn-type"
 
-OutputPin 	led3;
-OutputPin 	led4;
-InputPin 	btn;
+#define BKPSRAM_TEST_SIGNATURE	0x55555555
+#define BKPSRAM_TEST_OFFSET		0
 
-HardwareSerial	serail1;
-
-void
-btn_irq_handler(void *);
+HC05Bluetooth	hc05;
+OutputPin led4;
 
 int
 main(int argc, char* argv[])
 {
   // At this stage the system clock should have already been configured
   // at high speed.
+	uint32 val = 0;
 
-	serail1 = SERIAL4;
-	serail1.m_RxPin	= PA1;
-	serail1.m_TxPin	= PA0;
+	bkpsram_init();
+	val = bkpsram_read_32(BKPSRAM_TEST_OFFSET);
+	bkpsram_write_32(BKPSRAM_TEST_OFFSET, val + 1);
+	val = bkpsram_read_32(BKPSRAM_TEST_OFFSET);
 
-	led3 = PD13;
-	led4 = PD12;
-
-	btn = PB0;
-	btn.AttachInterrupt(btn_irq_handler);
-
-	serail1.Begin(9600);
+	trace("Signature: 0x%08X\n", val);
 
 	trace("RCC Clock: %d\n", RCC_SYSTEM_CLOCK);
 
+	led4 = PD14;
+
+	hc05 = SERIAL4;
+	hc05.m_RxPin	= PA1;
+	hc05.m_TxPin	= PA0;
+	hc05.m_CmdPin	= PD15;
+	hc05.m_PwrPin	= PB1;
+	hc05.m_StatPin 	= PB0;
+	hc05.Begin();
+
   // Infinite loop
+	uint32 counter = 0;
   while (1)
     {
        // Add your code here.
+	  if(hc05.Connected())
+	  {
+		  hc05.Send("Counter: %d\r\n", counter++);
+	  }
+
 	  led4 = !led4;
-	  Delay::Milli(500);
+	  Delay::Milli(1000);
     }
-}
-
-void
-btn_irq_handler(void *driver)
-{
-	(void)driver;
-
-	led3 = !led3;
 }
 
 #pragma GCC diagnostic pop
