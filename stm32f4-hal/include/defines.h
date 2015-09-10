@@ -61,6 +61,14 @@
 #define offsetof(type, member) __builtin_offsetof(type, member)
 #endif
 
+#ifndef SET
+#define SET 	1
+#endif
+
+#ifndef RESET
+#define RESET 	0
+#endif
+
 #if 1
 #define ASSERT_FAULT(expr) ((expr) ? (void)0 : assert_failed((uint8_t *)__FILE__, __LINE__))
 extern void assert_failed(uint8_t* file, uint32_t line);
