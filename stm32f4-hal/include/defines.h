@@ -69,6 +69,14 @@
 #define RESET 	0
 #endif
 
+#ifndef ENABLE
+#define ENABLE 	1
+#endif
+
+#ifndef DISABLE
+#define DISABLE	0
+#endif
+
 #if 1
 #define ASSERT_FAULT(expr) ((expr) ? (void)0 : assert_failed((uint8_t *)__FILE__, __LINE__))
 extern void assert_failed(uint8_t* file, uint32_t line);

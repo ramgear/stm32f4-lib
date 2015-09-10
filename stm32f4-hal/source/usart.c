@@ -9,9 +9,14 @@
  */
 
 #include <usart.h>
+#include <dma.h>
 
 #define	USART_DEV_ENTRY(NUM,AS)	\
 	[SERIAL##NUM]	=	{ .reg = U##AS##RT##NUM##_BASE, .clk_id = RCC_U##AS##RT##NUM, .irq = U##AS##RT##NUM##_IRQn }
+
+#define	USART_DMA_ENTRY(SNUM,DNUM,DSRX,DCRX,DSTX,DCTX)	\
+	[SERIAL##SNUM]	=	{ .dma = DMA_##DNUM, .dma_stream_rx = DMA_STREAM_##DSRX, .dma_channel_rx = DMA_CHANNEL_##DCRX, \
+			.dma_stream_tx = DMA_STREAM_##DSTX, .dma_channel_tx = DMA_CHANNEL_##DCTX}
 
 #define	USART_ISR(NUM,AS)	\
 		void ISR_U##AS##RT##NUM##_IRQHandler(void)
@@ -26,20 +31,6 @@ typedef struct usart_dev
 	const	nvic_irq_num	irq;
 } usart_dev;
 
-typedef union
-{
-	struct
-	{
-		uint32		stx			:8;	/* Start of frame */
-		uint32		etx			:8;	/* End of frame */
-		uint32		esc			:8;	/* Data escape */
-		uint32		enable		:1;
-		uint32		xfer		:1;
-		uint32		esc_found 	:1;
-	} flags;
-	uint32		all;
-} usart_frame_ctrl;
-
 typedef struct usart_driver
 {
 	const usart_dev		*p_dev;
@@ -48,10 +39,16 @@ typedef struct usart_driver
 	usart_tx_handler	tx_handler;
 	uint08				rx_buffer[USART_BUFFER_SIZE];
 	uint08				tx_buffer[USART_BUFFER_SIZE];
-	uint08				*p_rx_current;
-	uint08				data_count;
-	usart_frame_ctrl	frame_ctrl;
 } usart_driver;
+
+typedef struct usart_dma
+{
+	dma_num			dma;
+	dma_stream		dma_stream_rx;
+	dma_channel		dma_channel_rx;
+	dma_stream		dma_stream_tx;
+	dma_channel		dma_channel_tx;
+} usart_dma;
 
 __lookup_table
 usart_dev usart_dev_table[USART_NUM_MAX] =
@@ -62,6 +59,17 @@ usart_dev usart_dev_table[USART_NUM_MAX] =
 		USART_DEV_ENTRY(4,A),
 		USART_DEV_ENTRY(5,A),
 		USART_DEV_ENTRY(6,SA),
+};
+
+__lookup_table
+usart_dma usart_dma_table[USART_NUM_MAX] =
+{
+		USART_DMA_ENTRY(1,2,4,2,4,7),
+		USART_DMA_ENTRY(2,1,4,5,4,6),
+		USART_DMA_ENTRY(3,1,4,1,4,3),
+		USART_DMA_ENTRY(4,1,4,2,4,4),
+		USART_DMA_ENTRY(5,1,4,0,4,7),
+		USART_DMA_ENTRY(6,2,5,2,5,7),
 };
 
 usart_driver usart_drivers[USART_NUM_MAX];
@@ -91,6 +99,63 @@ usart_get_available(usart_num num)
 }
 
 void
+usart_dma_rx_handler(dma_num num, dma_stream stream);
+void
+usart_dma_tx_handler(dma_num num, dma_stream stream);
+
+void
+usart_dma_init(usart_num num)
+{
+	usart_driver	*driver = &usart_drivers[num];
+	const usart_dma *dma = &usart_dma_table[num];
+	usart_t *usart = (usart_t *)driver->p_dev->reg;
+
+	/* Initial RX DMA */
+	dma_stream_t	*rx_stream = dma_get_stream_reg(dma->dma, dma->dma_stream_rx);
+	dma_set_channel(rx_stream, dma->dma_channel_rx);
+	dma_set_paddr(rx_stream, (uint32)&usart->DR);
+	dma_set_m0addr(rx_stream, (uint32)driver->rx_buffer);
+	dma_set_direction(rx_stream, DMA_DIR_PER_TO_MEM);
+	dma_set_data_size(rx_stream, USART_BUFFER_SIZE);
+	dma_set_pinc_mode(rx_stream, DISABLE);
+	dma_set_minc_mode(rx_stream, ENABLE);
+	dma_set_minc_size(rx_stream, DMA_DATA_SIZE_8);
+	dma_set_pinc_size(rx_stream, DMA_DATA_SIZE_8);
+	dma_set_circular_mode(rx_stream, ENABLE);
+	dma_set_priority(rx_stream, DMA_PRIO_HIGH);
+	dma_set_direct_mode(rx_stream, DISABLE);
+	dma_set_fifo_threshold(rx_stream, DMA_FIFO_TH_FULL);
+	dma_set_mburst(rx_stream, DMA_BURST_1);
+	dma_set_pburst(rx_stream, DMA_BURST_1);
+
+	dma_set_handler(dma->dma, dma->dma_stream_rx, usart_dma_rx_handler);
+	dma_set_it(rx_stream, DMA_IT_TC, ENABLE);
+	dma_set_stream(rx_stream, ENABLE);
+
+	/* Initial TX DMA */
+	dma_stream_t	*tx_stream = dma_get_stream_reg(dma->dma, dma->dma_stream_tx);
+	dma_set_channel(tx_stream, dma->dma_channel_tx);
+	dma_set_paddr(tx_stream, (uint32)&usart->DR);
+	dma_set_m0addr(tx_stream, (uint32)driver->tx_buffer);
+	dma_set_direction(tx_stream, DMA_DIR_MEM_TO_PER);
+	dma_set_data_size(tx_stream, USART_BUFFER_SIZE);
+	dma_set_pinc_mode(tx_stream, DISABLE);
+	dma_set_minc_mode(tx_stream, ENABLE);
+	dma_set_minc_size(tx_stream, DMA_DATA_SIZE_8);
+	dma_set_pinc_size(tx_stream, DMA_DATA_SIZE_8);
+	dma_set_circular_mode(tx_stream, ENABLE);
+	dma_set_priority(tx_stream, DMA_PRIO_HIGH);
+	dma_set_direct_mode(tx_stream, DISABLE);
+	dma_set_fifo_threshold(tx_stream, DMA_FIFO_TH_FULL);
+	dma_set_mburst(tx_stream, DMA_BURST_1);
+	dma_set_pburst(tx_stream, DMA_BURST_1);
+
+	dma_set_handler(dma->dma, dma->dma_stream_tx, usart_dma_tx_handler);
+	dma_set_it(tx_stream, DMA_IT_TC, ENABLE);
+	dma_set_stream(tx_stream, ENABLE);
+}
+
+void
 usart_init(usart_num num)
 {
 	if(!usart_available(num))
@@ -105,17 +170,18 @@ usart_init(usart_num num)
 	/* initial driver */
 	driver->p_dev 					= dev;
 
-	/* initial framing control */
-	usart_frame_config(num, USART_FRAME_STX, USART_FRAME_ETX, USART_FRAME_ESC);
-	usart_frame_enable(num, false);
-
 	/* enable receive and transmit mode */
 	usart_t *usart = (usart_t *)dev->reg;
-	usart->CR1	= USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;
+	usart->CR1	= USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_IDLEIE;
 
 	/* Parity: none, stop bit: 0, flow control: none */
 	usart->CR2	= 0;
-	usart->CR3	= 0;
+
+	/* Enable TX/RX DMA */
+	usart->CR3	= USART_CR3_DMAT | USART_CR3_DMAR;
+
+	/* Initial DMA */
+	usart_dma_init(num);
 
 	usart_set_used(num);
 }
@@ -194,22 +260,6 @@ usart_get_af(usart_num num)
 }
 
 void
-usart_frame_enable(usart_num num, boolean enable)
-{
-	usart_drivers[num].frame_ctrl.flags.enable = enable;
-}
-
-void
-usart_frame_config(usart_num num, uint08 stx, uint08 etx, uint08 esc)
-{
-	usart_driver *driver = &usart_drivers[num];
-
-	driver->frame_ctrl.flags.stx	= stx;
-	driver->frame_ctrl.flags.etx	= etx;
-	driver->frame_ctrl.flags.esc	= esc;
-}
-
-void
 usart_set_rx_handler(usart_num num, usart_rx_handler handler)
 {
 	usart_drivers[num].rx_handler = handler;
@@ -233,112 +283,24 @@ usart_send(usart_num num, const uint08 data)
 	reg->DR = data;
 }
 
-static inline void
-usart_rx_add_buffer(usart_driver *driver, uint08 data)
-{
-	/*
-	 * Check to reset counter and buffer
-	 * note: it will overwrite previous data in buffer in case received more than buffer size.
-	 */
-	if(driver->data_count == USART_BUFFER_SIZE)
-	{
-		driver->data_count 		= 0;
-		driver->p_rx_current	= driver->rx_buffer;
-	}
-
-	*driver->p_rx_current++ = data;
-	driver->data_count++;
-}
-
-static inline void
-usart_rx_irq_handler(usart_driver *driver, uint08 data)
-{
-	if(driver->frame_ctrl.flags.enable)
-	{
-		/* Check byte stuffing frame control */
-		if(data == driver->frame_ctrl.flags.esc)
-		{
-			/* Only set stuffing flag for byte stuffing found */
-			driver->frame_ctrl.flags.esc_found = USART_FLAG_SET;
-		}
-		else
-		{
-			if(driver->frame_ctrl.flags.esc_found != USART_FLAG_RESET)
-			{
-				/* at this pointer previous data is byte stuffing */
-
-				/* Save data only when rx found start byte */
-				if(driver->frame_ctrl.flags.xfer != USART_FLAG_RESET)
-				{
-					usart_rx_add_buffer(driver, data);
-				}
-
-				/* reset byte stuffing flag */
-				driver->frame_ctrl.flags.esc_found = USART_FLAG_RESET;
-			}
-			else
-			{
-				/* At this point byte stuffing always be reset state */
-				/* Check starting frame control */
-				if(data == driver->frame_ctrl.flags.stx)
-				{
-					/*
-					 * Note: what happen when found start byte more than 1 time before found end byte?
-					 * 		Temporary use reset buffer and counter (avoid all previous received data!).
-					 */
-					/* Set rx start flag */
-					driver->frame_ctrl.flags.xfer = USART_FLAG_SET;
-
-					/* Reset buffer and counter */
-					driver->p_rx_current			= driver->rx_buffer;
-					driver->data_count				= 0;
-				}
-				else if(driver->frame_ctrl.flags.xfer != USART_FLAG_RESET)
-				{
-					if(data == driver->frame_ctrl.flags.etx)
-					{
-						/* Set rx end flag */
-						driver->frame_ctrl.flags.xfer = USART_FLAG_RESET;
-
-						/* framing is end then callback to handler with rx buffer data */
-						(*driver->rx_handler)(driver->p_owner, driver->rx_buffer, driver->data_count);
-					}
-					else
-					{
-						/* Save data into rx buffer */
-						usart_rx_add_buffer(driver, data);
-					}
-				}
-			}
-		}
-	}
-	else
-	{
-		/* framing is disabled then callback to handler with 1 byte data */
-		(*driver->rx_handler)(driver->p_owner, &data, 1);
-	}
-}
-
 static void
 usart_irq_handler(usart_num num)
 {
-	CPU_SR_ALLOC
 	usart_driver *driver = &usart_drivers[num];
-
 	usart_t *usart = (usart_t *)driver->p_dev->reg;
 
-	if (usart->SR & USART_SR_RXNE)
+	if (usart->SR & USART_SR_IDLE)
 	{
-		uint08 data = (char)((usart_t *)driver->p_dev->reg)->DR;
-		usart_rx_irq_handler(driver, data);
-	}
-	if (usart->SR & USART_SR_TC)
-	{
-		(*driver->tx_handler)(driver->p_owner);
-	}
+		//usart->CR1	&= ~USART_CR1_IDLEIE;
+		char data = (char)((usart_t *)driver->p_dev->reg)->DR;
+		(void)data;
 
-	CPU_ENTER_CRITICAL
-	CPU_EXIT_CRITICAL
+		/* framing is end then callback to handler with rx buffer data */
+		(*driver->rx_handler)(driver->p_owner, driver->rx_buffer, 0);
+
+		/* Clear received buffer */
+		memset(driver->rx_buffer, 0, USART_BUFFER_SIZE);
+	}
 }
 
 /**********************************************************************************
@@ -373,4 +335,21 @@ USART_ISR(5,A)
 USART_ISR(6,SA)
 {
 	usart_irq_handler(SERIAL6);
+}
+
+
+/**********************************************************************************
+ * DMA Interrupt Service Routines Handler
+ *********************************************************************************/
+
+void
+usart_dma_rx_handler(dma_num num, dma_stream stream)
+{
+
+}
+
+void
+usart_dma_tx_handler(dma_num num, dma_stream stream)
+{
+
 }

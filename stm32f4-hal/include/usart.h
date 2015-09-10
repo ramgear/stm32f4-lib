@@ -69,12 +69,6 @@ gpio_af
 usart_get_af(usart_num num);
 
 void
-usart_frame_enable(usart_num num, boolean enable);
-
-void
-usart_frame_config(usart_num num, uint08 stx, uint08 etx, uint08 esc);
-
-void
 usart_set_rx_handler(usart_num num, usart_rx_handler handler);
 
 void
