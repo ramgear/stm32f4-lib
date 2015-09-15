@@ -23,6 +23,18 @@
 /* Exported types ------------------------------------------------------------*/
 typedef IRQn_Type nvic_irq_num;
 
+typedef enum nvic_prio_group
+{
+	NVIC_PRIO_GROUP_0,
+	NVIC_PRIO_GROUP_1,
+	NVIC_PRIO_GROUP_2,
+	NVIC_PRIO_GROUP_3,
+	NVIC_PRIO_GROUP_4,
+	NVIC_PRIO_GROUP_5,
+	NVIC_PRIO_GROUP_6,
+	NVIC_PRIO_GROUP_7,
+} nvic_prio_group;
+
 /* Exported constants --------------------------------------------------------*/
 
 #define NVIC_REG			((nvic_t	*)NVIC_BASE      )   /*!< NVIC configuration struct           */
@@ -54,7 +66,7 @@ nvic_irq_disable(nvic_irq_num irq)
 }
 
 static inline void
-nvic_set_priority_group(uint08 prigroup)
+nvic_set_priority_group(nvic_prio_group prigroup)
 {
 	uint32 reg_value;
 	uint32 tmp = (prigroup & (uint32)0x07);               /* only values 0..7 are used          */

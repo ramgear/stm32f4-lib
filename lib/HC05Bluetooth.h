@@ -27,7 +27,7 @@ extern "C"
 /* Exported types ------------------------------------------------------------*/
 
 /* Exported constants --------------------------------------------------------*/
-#define	HC05_MAX_SPEED	1382400
+#define	HC05_DEFAULT_SPEED	115200	// 1382400
 #define	HC05_CMD_SPEED	38400
 
 #define	HC05_DEFAULT_NAME	"RAM-BT"
@@ -47,8 +47,11 @@ public:
 	OutputPin	m_CmdPin;
 	InputPin	m_StatPin;
 
+	volatile bool mProcessCmd;
+	char mMsgBuffer[USART_BUFFER_SIZE];
+
 public:
-	HC05Bluetooth()
+	HC05Bluetooth() : mProcessCmd(false)
 	{
 
 	}
@@ -64,12 +67,38 @@ public:
 	}
 
 	virtual void
-	Begin(uint32 speed = HC05_MAX_SPEED);
+	Begin(uint32 speed = HC05_DEFAULT_SPEED);
 
 	bool
 	Connected(void)
 	{
 		return m_bStat;
+	}
+
+	void
+	OnRxInterrupt(uint32 count)
+	{
+		HardwareSerial::OnRxInterrupt(count);
+
+		if(!strncmp(rx_buffer, "AT\r\n", 4) || !strncmp(rx_buffer, "AT+", 3))
+		{
+			mProcessCmd = true;
+		}
+	}
+
+	void
+	ProcessCommand(const char *cmd)
+	{
+		Send("Command: %s", cmd);
+
+		EnterCmdMode();
+		Send("%s", cmd);
+		WaitReceiveData(1000);
+		ExitCmdMode();
+
+		/* Send command response */
+		GetReceivedData(mMsgBuffer);
+		Send("Response: %s", mMsgBuffer);
 	}
 
 	void
@@ -81,11 +110,11 @@ public:
 	void
 	ConfigureDevice(void)
 	{
-		EnterCmdMode();
+		EnterCmdMode(true);
 		SetName(HC05_DEFAULT_NAME);
 		SetPassword(HC05_DEFAULT_PSWD);
-		SetSpeed(HC05_MAX_SPEED);
-		ExitCmdMode();
+		SetSpeed(HC05_DEFAULT_SPEED);
+		ExitCmdMode(true);
 	}
 
 	void
@@ -107,19 +136,30 @@ public:
 	}
 
 	void
-	EnterCmdMode(void)
+	EnterCmdMode(boolean hard = false)
 	{
-		PowerOff();
-		m_CmdPin = true;
-		PowerOn();
+		if(hard)
+		{
+			PowerOff();
+			m_CmdPin = true;
+			PowerOn();
 
-		HardwareSerial::Begin(HC05_CMD_SPEED);
+			HardwareSerial::Begin(HC05_CMD_SPEED);
+		}
+		else
+		{
+			m_CmdPin = true;
+			Delay::Milli(100);
+		}
 	}
 	void
-	ExitCmdMode(void)
+	ExitCmdMode(boolean reset = false)
 	{
 		m_CmdPin = false;
-		PowerReset();
+		Delay::Milli(100);
+
+		if(reset)
+			PowerReset();
 	}
 
 	void

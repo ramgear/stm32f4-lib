@@ -43,7 +43,7 @@ typedef enum usart_num
 	SERIAL_INVALID,
 } usart_num;
 
-typedef	void (*usart_rx_handler)(void *sender, uint08 *data, uint08 len);
+typedef	void (*usart_rx_handler)(void *sender, uint32 count);
 typedef	void (*usart_tx_handler)(void *sender);
 
 /**********************************************************************************
@@ -76,6 +76,12 @@ usart_set_tx_handler(usart_num num, usart_tx_handler handler);
 
 void
 usart_send(usart_num num, const uint08 data);
+
+void
+usart_send_dma(usart_num num, const uint08 *data, uint32 count);
+
+void
+usart_read(usart_num num, uint08 *data, uint32 count);
 
 #ifdef __cplusplus
 }

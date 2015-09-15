@@ -66,7 +66,6 @@ typedef enum dma_it
 	DMA_IT_TE	= 0x00000004,
 	DMA_IT_HT	= 0x00000008,
 	DMA_IT_TC	= 0x00000010,
-	DMA_IT_FE	= 0x00000080,
 } dma_it;
 
 typedef enum dma_fifo_threshold
@@ -106,18 +105,37 @@ typedef enum dma_data_size
 	DMA_DATA_SIZE_32,
 } dma_data_size;
 
-typedef	void (*dma_irq_handler_t)(dma_num num, dma_stream stream);
+typedef	void (*dma_irq_handler_t)(void *owner, dma_num num, dma_stream stream);
 
 /* Exported constants --------------------------------------------------------*/
+#define	DMA_NUM_MAX			2
+#define	DMA_STREAM_MAX		8
+#define	DMA_CHANNEL_MAX		8
 
 /* Exported macro ------------------------------------------------------------*/
+#define	DMA_STREAM_BASE(DNUM,SNUM)	(DMA##DNUM##_BASE + 0x10 + 0x18 * SNUM)
 
 /* Exported functions --------------------------------------------------------*/
-dma_stream_t *
-dma_get_stream_reg(dma_num num, dma_stream stream);
+void
+dma_clk_enable(dma_num num);
+
+void
+dma_set_irq_enable(dma_num num, dma_stream stream, uint32 stat);
 
 void
 dma_set_it(dma_stream_t *stream, dma_it flag, uint32 stat);
+
+uint32
+dma_get_it(dma_num num, dma_stream stream, dma_it flag);
+
+void
+dma_clear_it_pending(dma_num num, dma_stream stream, dma_it flag);
+
+void
+dma_clear_stream_flags(dma_num num, dma_stream stream);
+
+dma_stream_t *
+dma_get_stream(dma_num num, dma_stream stream);
 
 void
 dma_set_stream(dma_stream_t *stream, uint32 stat);
@@ -183,7 +201,7 @@ void
 dma_set_data_size(dma_stream_t *stream, uint32 size);
 
 boolean
-dma_set_handler(dma_num num, dma_stream stream, dma_irq_handler_t handler);
+dma_set_handler(dma_num num, dma_stream stream, dma_channel channel, dma_irq_handler_t handler, void *owner);
 
 #ifdef __cplusplus
 }

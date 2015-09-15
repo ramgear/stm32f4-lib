@@ -9,6 +9,7 @@
  */
 
 #include <cpu.h>
+#include <nvic.h>
 #include <rcc.h>
 #include <pwr.h>
 #include <flash.h>
@@ -54,6 +55,9 @@
  void
  cpu_init(void)
  {
+	 /* Set 3 bit (8) preemption and 5 bit (32) sub-priority*/
+	 nvic_set_priority_group(NVIC_PRIO_GROUP_4);
+
 	/* Initial system tick timer */
 	systick_init();
 	systick_irq_enable();

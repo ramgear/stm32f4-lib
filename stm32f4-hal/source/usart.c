@@ -14,9 +14,10 @@
 #define	USART_DEV_ENTRY(NUM,AS)	\
 	[SERIAL##NUM]	=	{ .reg = U##AS##RT##NUM##_BASE, .clk_id = RCC_U##AS##RT##NUM, .irq = U##AS##RT##NUM##_IRQn }
 
-#define	USART_DMA_ENTRY(SNUM,DNUM,DSRX,DCRX,DSTX,DCTX)	\
-	[SERIAL##SNUM]	=	{ .dma = DMA_##DNUM, .dma_stream_rx = DMA_STREAM_##DSRX, .dma_channel_rx = DMA_CHANNEL_##DCRX, \
-			.dma_stream_tx = DMA_STREAM_##DSTX, .dma_channel_tx = DMA_CHANNEL_##DCTX}
+#define	USART_DMA_ENTRY(SNUM,DNUM,DCRX,DSRX,DCTX,DSTX)	\
+	[SERIAL##SNUM]	=	{ .dma = (uint08)DMA_##DNUM, \
+			.rx_stream = (uint08)DMA_STREAM_##DSRX, .rx_stream_base = DMA_STREAM_BASE(DNUM,DSRX), .rx_channel = (uint08)DMA_CHANNEL_##DCRX, \
+			.tx_stream = (uint08)DMA_STREAM_##DSTX, .tx_stream_base = DMA_STREAM_BASE(DNUM,DSTX), .tx_channel = (uint08)DMA_CHANNEL_##DCTX}
 
 #define	USART_ISR(NUM,AS)	\
 		void ISR_U##AS##RT##NUM##_IRQHandler(void)
@@ -31,6 +32,20 @@ typedef struct usart_dev
 	const	nvic_irq_num	irq;
 } usart_dev;
 
+typedef struct usart_dma
+{
+	uint08			dma;
+	uint08			rx_stream;
+	uint08			rx_channel;
+	uint08			reserved1;
+	uint32			rx_stream_base;
+	uint08			tx_stream;
+	uint08			tx_channel;
+	uint08			reserved2;
+	uint08			reserved3;
+	uint32			tx_stream_base;
+} usart_dma;
+
 typedef struct usart_driver
 {
 	const usart_dev		*p_dev;
@@ -39,16 +54,10 @@ typedef struct usart_driver
 	usart_tx_handler	tx_handler;
 	uint08				rx_buffer[USART_BUFFER_SIZE];
 	uint08				tx_buffer[USART_BUFFER_SIZE];
+	uint08				rx_head;
+	uint08				rx_tail;
+	const usart_dma		*p_usart_dma;
 } usart_driver;
-
-typedef struct usart_dma
-{
-	dma_num			dma;
-	dma_stream		dma_stream_rx;
-	dma_channel		dma_channel_rx;
-	dma_stream		dma_stream_tx;
-	dma_channel		dma_channel_tx;
-} usart_dma;
 
 __lookup_table
 usart_dev usart_dev_table[USART_NUM_MAX] =
@@ -99,20 +108,25 @@ usart_get_available(usart_num num)
 }
 
 void
-usart_dma_rx_handler(dma_num num, dma_stream stream);
+usart_dma_rx_handler(void *owner, dma_num num, dma_stream stream);
 void
-usart_dma_tx_handler(dma_num num, dma_stream stream);
+usart_dma_tx_handler(void *owner, dma_num num, dma_stream stream);
 
 void
-usart_dma_init(usart_num num)
+usart_set_rx_dma_enable(usart_t *usart, uint32 stat);
+void
+usart_set_tx_dma_enable(usart_t *usart, uint32 stat);
+
+void
+usart_dma_init_rx(usart_num num)
 {
 	usart_driver	*driver = &usart_drivers[num];
 	const usart_dma *dma = &usart_dma_table[num];
 	usart_t *usart = (usart_t *)driver->p_dev->reg;
 
 	/* Initial RX DMA */
-	dma_stream_t	*rx_stream = dma_get_stream_reg(dma->dma, dma->dma_stream_rx);
-	dma_set_channel(rx_stream, dma->dma_channel_rx);
+	dma_stream_t	*rx_stream = (dma_stream_t *)dma->rx_stream_base;
+	dma_set_channel(rx_stream, dma->rx_channel);
 	dma_set_paddr(rx_stream, (uint32)&usart->DR);
 	dma_set_m0addr(rx_stream, (uint32)driver->rx_buffer);
 	dma_set_direction(rx_stream, DMA_DIR_PER_TO_MEM);
@@ -123,18 +137,29 @@ usart_dma_init(usart_num num)
 	dma_set_pinc_size(rx_stream, DMA_DATA_SIZE_8);
 	dma_set_circular_mode(rx_stream, ENABLE);
 	dma_set_priority(rx_stream, DMA_PRIO_HIGH);
-	dma_set_direct_mode(rx_stream, DISABLE);
+	dma_set_direct_mode(rx_stream, ENABLE);
 	dma_set_fifo_threshold(rx_stream, DMA_FIFO_TH_FULL);
 	dma_set_mburst(rx_stream, DMA_BURST_1);
 	dma_set_pburst(rx_stream, DMA_BURST_1);
 
-	dma_set_handler(dma->dma, dma->dma_stream_rx, usart_dma_rx_handler);
+	dma_set_handler(dma->dma, dma->rx_stream, dma->rx_channel, usart_dma_rx_handler, (void *)driver);
 	dma_set_it(rx_stream, DMA_IT_TC, ENABLE);
+	dma_set_irq_enable(dma->dma, dma->rx_stream, ENABLE);
+	dma_clear_stream_flags(dma->dma, dma->rx_stream);
+	usart_set_rx_dma_enable(usart, ENABLE);
 	dma_set_stream(rx_stream, ENABLE);
+}
+
+void
+usart_dma_init_tx(usart_num num)
+{
+	usart_driver	*driver = &usart_drivers[num];
+	const usart_dma *dma = &usart_dma_table[num];
+	usart_t *usart = (usart_t *)driver->p_dev->reg;
 
 	/* Initial TX DMA */
-	dma_stream_t	*tx_stream = dma_get_stream_reg(dma->dma, dma->dma_stream_tx);
-	dma_set_channel(tx_stream, dma->dma_channel_tx);
+	dma_stream_t	*tx_stream = (dma_stream_t *)dma->tx_stream_base;
+	dma_set_channel(tx_stream, dma->tx_channel);
 	dma_set_paddr(tx_stream, (uint32)&usart->DR);
 	dma_set_m0addr(tx_stream, (uint32)driver->tx_buffer);
 	dma_set_direction(tx_stream, DMA_DIR_MEM_TO_PER);
@@ -143,16 +168,49 @@ usart_dma_init(usart_num num)
 	dma_set_minc_mode(tx_stream, ENABLE);
 	dma_set_minc_size(tx_stream, DMA_DATA_SIZE_8);
 	dma_set_pinc_size(tx_stream, DMA_DATA_SIZE_8);
-	dma_set_circular_mode(tx_stream, ENABLE);
+	dma_set_circular_mode(tx_stream, DISABLE);
 	dma_set_priority(tx_stream, DMA_PRIO_HIGH);
-	dma_set_direct_mode(tx_stream, DISABLE);
+	dma_set_direct_mode(tx_stream, ENABLE);
 	dma_set_fifo_threshold(tx_stream, DMA_FIFO_TH_FULL);
 	dma_set_mburst(tx_stream, DMA_BURST_1);
 	dma_set_pburst(tx_stream, DMA_BURST_1);
 
-	dma_set_handler(dma->dma, dma->dma_stream_tx, usart_dma_tx_handler);
+	dma_set_handler(dma->dma, dma->tx_stream, dma->tx_channel, usart_dma_tx_handler, (void *)driver);
 	dma_set_it(tx_stream, DMA_IT_TC, ENABLE);
-	dma_set_stream(tx_stream, ENABLE);
+	dma_set_irq_enable(dma->dma, dma->tx_stream, ENABLE);
+	usart_set_tx_dma_enable(usart, ENABLE);
+}
+
+void
+usart_dma_init(usart_num num)
+{
+	usart_driver	*driver = &usart_drivers[num];
+	const usart_dma *dma = &usart_dma_table[num];
+	driver->p_usart_dma = dma;
+
+	/* Enable DMA Clock */
+	dma_clk_enable(dma->dma);
+
+	usart_dma_init_tx(num);
+	usart_dma_init_rx(num);
+}
+
+void
+usart_set_rx_dma_enable(usart_t *usart, uint32 stat)
+{
+	if(stat != DISABLE)
+		usart->CR3 |= USART_CR3_DMAR;
+	else
+		usart->CR3 &= ~USART_CR3_DMAR;
+}
+
+void
+usart_set_tx_dma_enable(usart_t *usart, uint32 stat)
+{
+	if(stat != DISABLE)
+		usart->CR3 |= USART_CR3_DMAT;
+	else
+		usart->CR3 &= ~USART_CR3_DMAT;
 }
 
 void
@@ -172,13 +230,16 @@ usart_init(usart_num num)
 
 	/* enable receive and transmit mode */
 	usart_t *usart = (usart_t *)dev->reg;
-	usart->CR1	= USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_IDLEIE;
+	usart->CR1	= USART_CR1_TE | USART_CR1_RE | USART_CR1_UE | USART_CR1_IDLEIE;
 
 	/* Parity: none, stop bit: 0, flow control: none */
 	usart->CR2	= 0;
 
 	/* Enable TX/RX DMA */
-	usart->CR3	= USART_CR3_DMAT | USART_CR3_DMAR;
+	usart->CR3	= 0;
+
+	(void)usart->SR;
+	(void)usart->DR;
 
 	/* Initial DMA */
 	usart_dma_init(num);
@@ -283,23 +344,71 @@ usart_send(usart_num num, const uint08 data)
 	reg->DR = data;
 }
 
+void
+usart_send_dma(usart_num num, const uint08 *data, uint32 count)
+{
+	usart_driver *driver = &usart_drivers[num];
+	dma_stream_t *stream = (dma_stream_t *)driver->p_usart_dma->tx_stream_base;
+
+	memcpy(driver->tx_buffer, data, count);
+
+	dma_set_data_size((dma_stream_t *)driver->p_usart_dma->tx_stream_base, count);
+	dma_set_stream(stream, ENABLE);
+}
+
+void
+usart_read(usart_num num, uint08 *data, uint32 count)
+{
+	usart_driver *driver = &usart_drivers[num];
+	uint32	len;
+	uint08	*ptr;
+
+	/* Copy received data */
+	if(driver->rx_head + count < USART_BUFFER_SIZE)
+	{
+		memcpy(data, driver->rx_buffer + driver->rx_head, count);
+
+		/* update current head */
+		driver->rx_head += count;
+	}
+	else
+	{
+		ptr = data;
+		len = USART_BUFFER_SIZE - driver->rx_head;
+		memcpy(ptr, driver->rx_buffer + driver->rx_head, len);
+		ptr += len;
+		len = count - len;
+		memcpy(ptr, driver->rx_buffer, len);
+
+		driver->rx_head = len;
+	}
+}
+
 static void
 usart_irq_handler(usart_num num)
 {
 	usart_driver *driver = &usart_drivers[num];
 	usart_t *usart = (usart_t *)driver->p_dev->reg;
+	dma_stream_t *stream = (dma_stream_t *)driver->p_usart_dma->rx_stream_base;
+	uint32 count;
 
 	if (usart->SR & USART_SR_IDLE)
 	{
-		//usart->CR1	&= ~USART_CR1_IDLEIE;
-		char data = (char)((usart_t *)driver->p_dev->reg)->DR;
-		(void)data;
+		(void)((usart_t *)driver->p_dev->reg)->DR;
+
+		driver->rx_tail = USART_BUFFER_SIZE - stream->NDTR;
+
+		if(driver->rx_head > driver->rx_tail)
+		{
+			count = (USART_BUFFER_SIZE - driver->rx_head) + driver->rx_tail;
+		}
+		else
+		{
+			count = driver->rx_tail - driver->rx_head;
+		}
 
 		/* framing is end then callback to handler with rx buffer data */
-		(*driver->rx_handler)(driver->p_owner, driver->rx_buffer, 0);
-
-		/* Clear received buffer */
-		memset(driver->rx_buffer, 0, USART_BUFFER_SIZE);
+		(*driver->rx_handler)(driver->p_owner, count);
 	}
 }
 
@@ -343,13 +452,35 @@ USART_ISR(6,SA)
  *********************************************************************************/
 
 void
-usart_dma_rx_handler(dma_num num, dma_stream stream)
+usart_dma_rx_handler(void *owner, dma_num num, dma_stream stream)
 {
+	usart_driver *driver = (usart_driver *)owner;
+	//dma_stream_t *p_stream = (dma_stream_t *)driver->p_usart_dma->rx_stream_base;
 
+	/* Check complete transfer interrupt flag */
+	if(dma_get_it(num, stream, DMA_IT_TC) != RESET)
+	{
+		/* Clear pending */
+		dma_clear_it_pending(num, stream, DMA_IT_TC);
+
+		/* Reset tail of buffer */
+		driver->rx_tail = 0;
+	}
+
+	/* Clear error flag */
+	dma_clear_it_pending(num, stream, DMA_IT_TE);
 }
 
 void
-usart_dma_tx_handler(dma_num num, dma_stream stream)
+usart_dma_tx_handler(void *owner, dma_num num, dma_stream stream)
 {
+	//usart_driver *driver = (usart_driver *)owner;
+	//dma_stream_t *p_stream = (dma_stream_t *)driver->p_usart_dma->tx_stream_base;
 
+	/* Check complete transfer interrupt flag */
+	if(dma_get_it(num, stream, DMA_IT_TC) != RESET)
+	{
+		/* Clear pending */
+		dma_clear_it_pending(num, stream, DMA_IT_TC);
+	}
 }

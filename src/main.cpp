@@ -13,6 +13,7 @@
 #include <HC05Bluetooth.h>
 
 #include <bkpsram.h>
+#include <flash.h>
 
 // ----------------------------------------------------------------------------
 //
@@ -38,7 +39,7 @@
 #define BKPSRAM_TEST_OFFSET		0
 
 HC05Bluetooth	hc05;
-OutputPin led4;
+OutputPin led3;
 
 int
 main(int argc, char* argv[])
@@ -56,28 +57,31 @@ main(int argc, char* argv[])
 
 	trace("RCC Clock: %d\n", RCC_SYSTEM_CLOCK);
 
-	led4 = PD14;
+	led3 = PD13;
 
 	hc05 = SERIAL4;
 	hc05.m_RxPin	= PA1;
 	hc05.m_TxPin	= PA0;
 	hc05.m_CmdPin	= PD15;
-	hc05.m_PwrPin	= PB1;
+	hc05.m_PwrPin	= PD14;
 	hc05.m_StatPin 	= PB0;
 	hc05.Begin();
 
+	//hc05.ConfigureDevice();
+
   // Infinite loop
-	uint32 counter = 0;
+	char buff[64];
   while (1)
     {
-       // Add your code here.
-	  if(hc05.Connected())
+	  if(hc05.mProcessCmd)
 	  {
-		  hc05.Send("Counter: %d\r\n", counter++);
+		  hc05.GetReceivedData(buff);
+		  hc05.ProcessCommand(buff);
+		  hc05.mProcessCmd = false;
 	  }
 
-	  led4 = !led4;
-	  Delay::Milli(1000);
+	  //hc05.Send("Test\r\n");
+	  Delay::Milli(100);
     }
 }
 

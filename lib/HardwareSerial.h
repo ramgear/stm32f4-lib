@@ -15,6 +15,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include <stdarg.h>
 #include <usart.h>
+#include <systick.h>
 #include <AlternatePin.h>
 
 #ifdef __cplusplus
@@ -30,7 +31,7 @@ extern "C"
 
 /* Exported functions --------------------------------------------------------*/
 void
-rx_irq_callback(void *sender, uint08 *data, uint08 len);
+rx_irq_callback(void *sender, uint32 count);
 void
 tx_irq_callback(void *sender);
 
@@ -41,9 +42,8 @@ protected:
 
 	char			tx_buffer[USART_BUFFER_SIZE];
 	char			rx_buffer[USART_BUFFER_SIZE];
-	uint32			rx_index;
 	bool			tx_ready;
-	bool			RxReceived;
+	volatile bool			mReceived;
 
 public:
 	AlternatePin	m_RxPin;
@@ -51,7 +51,7 @@ public:
 
 public:
 	HardwareSerial()
-	: m_serial_no(SERIAL_INVALID), rx_index(0), tx_ready(false), RxReceived(false)
+	: m_serial_no(SERIAL_INVALID), tx_ready(false), mReceived(false)
 	{
 
 	}
@@ -108,32 +108,47 @@ public:
 		  if (ret > 0)
 		    {
 			  //trace("Send: %s", tx_buffer);
-
+			  usart_send_dma(m_serial_no, (const uint08 *)tx_buffer, ret);
+/*
 			  ptr = (uint08 *)tx_buffer;
 			  tx_ready = true;
 			  while(ret--)
 			  {
 				  while(!tx_ready);
 				  usart_send(m_serial_no, *ptr++);
-			  }
+			  }*/
 		    }
 
 		  va_end (ap);
 	}
 
-	void OnRxInterrupt(uint08 *data, uint08 len)
+	void
+	WaitReceiveData(uint32 timeout = 1000)
 	{
-		(void)len;
+		uint32 milli_end = systick_get_milli() + timeout;
 
-		rx_buffer[rx_index++] = *data;
+		while(!mReceived && (systick_get_milli() < milli_end));
 
-		if(*data == '\n')
+		if(!mReceived)
 		{
-			rx_buffer[rx_index] = 0;
-			rx_index = 0;
-
-			RxReceived = true;
+			strcpy(rx_buffer, "Timeout!\r\n");
 		}
+	}
+
+	void
+	GetReceivedData(char *data)
+	{
+		strcpy(data, rx_buffer);
+		memset(rx_buffer, 0, USART_BUFFER_SIZE);
+		mReceived = false;
+	}
+
+	virtual void
+	OnRxInterrupt(uint32 count)
+	{
+		memset(rx_buffer, 0, sizeof(rx_buffer));
+		usart_read(m_serial_no, (uint08 *)rx_buffer, count);
+		mReceived = true;
 	}
 
 	void OnTxInterrupt(void)
