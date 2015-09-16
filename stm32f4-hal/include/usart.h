@@ -23,6 +23,8 @@
 #include <gpio.h>
 
 #define	USART_BUFFER_SIZE		64
+#define	USART_RX_BUFFER_SIZE	USART_BUFFER_SIZE
+#define	USART_TX_BUFFER_SIZE	USART_BUFFER_SIZE
 #define	USART_FRAME_STX			0x02
 #define	USART_FRAME_ETX			0x03
 #define	USART_FRAME_ESC			0x1B
@@ -82,6 +84,9 @@ usart_send_dma(usart_num num, const uint08 *data, uint32 count);
 
 void
 usart_read(usart_num num, uint08 *data, uint32 count);
+
+boolean
+usart_wait_receive(usart_num num, uint32 timeout);
 
 #ifdef __cplusplus
 }

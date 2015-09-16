@@ -10,6 +10,7 @@
 
 #include <usart.h>
 #include <dma.h>
+#include <systick.h>
 
 #define	USART_DEV_ENTRY(NUM,AS)	\
 	[SERIAL##NUM]	=	{ .reg = U##AS##RT##NUM##_BASE, .clk_id = RCC_U##AS##RT##NUM, .irq = U##AS##RT##NUM##_IRQn }
@@ -57,6 +58,7 @@ typedef struct usart_driver
 	uint08				rx_head;
 	uint08				rx_tail;
 	const usart_dma		*p_usart_dma;
+	volatile boolean				received;
 } usart_driver;
 
 __lookup_table
@@ -382,6 +384,24 @@ usart_read(usart_num num, uint08 *data, uint32 count)
 
 		driver->rx_head = len;
 	}
+
+	//driver->received = false;
+}
+
+boolean
+usart_wait_receive(usart_num num, uint32 timeout)
+{
+	usart_driver *driver = &usart_drivers[num];
+	uint32 end_ms = systick_get_milli() + timeout;
+
+	driver->received = false;
+	while(!driver->received)
+	{
+		if(systick_get_milli() > end_ms)
+			break;
+	}
+
+	return driver->received;
 }
 
 static void
@@ -406,6 +426,9 @@ usart_irq_handler(usart_num num)
 		{
 			count = driver->rx_tail - driver->rx_head;
 		}
+
+		/* Set data received flag on idle detected */
+		driver->received = true;
 
 		/* framing is end then callback to handler with rx buffer data */
 		(*driver->rx_handler)(driver->p_owner, count);
@@ -474,6 +497,7 @@ usart_dma_rx_handler(void *owner, dma_num num, dma_stream stream)
 void
 usart_dma_tx_handler(void *owner, dma_num num, dma_stream stream)
 {
+	(void)owner;
 	//usart_driver *driver = (usart_driver *)owner;
 	//dma_stream_t *p_stream = (dma_stream_t *)driver->p_usart_dma->tx_stream_base;
 

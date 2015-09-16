@@ -134,7 +134,7 @@ dma_clear_it_pending(dma_num num, dma_stream stream, dma_it flag)
 	}
 	else
 	{
-		dma->HIFCR |= (flag << dma_stream_flag_table[stream]);
+		dma->HIFCR |= (flag << CPU_POS_OF(dma_stream_flag_table[stream]));
 	}
 }
 
