@@ -9,11 +9,9 @@
  */
 #include <string.h>
 #include <HC05Bluetooth.h>
+#include "shell.h"
 
 extern "C" {
-
-#define	CMD_FUNC(cmd)	void cmd_##cmd(void *caller, void *arg)
-#define	CMD_ENTRY(cmd)	{#cmd, cmd_##cmd}
 
 void
 hc05_stat_changed(void *owner)
@@ -21,52 +19,51 @@ hc05_stat_changed(void *owner)
 	((HC05Bluetooth *)owner)->OnStatChanged();
 }
 
-typedef	void	(*cmd_func_t)(void *caller, void *arg);
-
-typedef struct cmd_shell_t
-{
-	const char		*cmd;
-	cmd_func_t		func;
-} cmd_shell_t;
-
 /* Define command here */
-CMD_FUNC(echo);
-CMD_FUNC(reset);
-CMD_FUNC(restart);
+SHELL_FUNC(echo);
+SHELL_FUNC(reset);
+SHELL_FUNC(restart);
+SHELL_FUNC(flash);
 
 /* List command table here */
 __lookup_table
-cmd_shell_t cmd_shell_table[] =
+shell_t cmd_shell_table[] =
 {
-		CMD_ENTRY(echo),
-		CMD_ENTRY(reset),
-		CMD_ENTRY(restart),
+		SHELL_ENTRY(echo),
+		SHELL_ENTRY(reset),
+		SHELL_ENTRY(restart),
+		SHELL_ENTRY(flash),
 		{ NULL, NULL}
 };
 
 /* Implement command here */
-CMD_FUNC(echo)
+SHELL_FUNC(echo)
 {
 	HC05Bluetooth *obj = (HC05Bluetooth *)caller;
-	(void)arg;
+	(void)argv;
 
-	obj->Send("%s\r\n", arg);
+	obj->Send("%s\r\n", SHELL_ARG(1));
 }
 
-CMD_FUNC(reset)
+SHELL_FUNC(reset)
 {
 	HC05Bluetooth *obj = (HC05Bluetooth *)caller;
-	(void)arg;
+	(void)argv;
 
 	obj->ConfigureDevice();
 }
 
-CMD_FUNC(restart)
+SHELL_FUNC(restart)
 {
 	(void)caller;
-	(void)arg;
+	(void)argv;
 
 	scb_reset();
+}
+
+SHELL_FUNC(flash)
+{
+	//uint32 idx = getopt(argc, argv, "");
 }
 
 }
@@ -89,33 +86,5 @@ HC05Bluetooth::Begin(uint32 speed)
 void
 HC05Bluetooth::ProcessCommand(char *cmd)
 {
-	char args[2][32];
-	char *p_cmd = cmd + 1;
-	char *ptr	= NULL;
-	uint08	argc = 0;
-
-	ptr = strtok(p_cmd, " \n");
-	sscanf(ptr, "%s", args[argc]);
-	argc++;
-	ptr = strtok(NULL, "\n");
-	if(ptr != NULL)
-	{
-		strcpy(args[argc], ptr);
-	}
-
-	if(argc == 0)
-	{
-		return;
-	}
-
-	const cmd_shell_t *pCmdShell = cmd_shell_table;
-	while(pCmdShell->cmd != NULL)
-	{
-		if(!strcmp(pCmdShell->cmd, args[0]))
-		{
-			(*pCmdShell->func)(this, args[1]);
-			break;
-		}
-		pCmdShell++;
-	}
+	shell_exec(cmd_shell_table, cmd, this);
 }
