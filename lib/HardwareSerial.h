@@ -99,7 +99,6 @@ public:
 	{
 		int ret;
 		  va_list ap;
-		  uint08	*ptr;
 
 		  va_start (ap, format);
 
@@ -109,30 +108,15 @@ public:
 		    {
 			  //trace("Send: %s", tx_buffer);
 			  usart_send_dma(m_serial_no, (const uint08 *)tx_buffer, ret);
-/*
-			  ptr = (uint08 *)tx_buffer;
-			  tx_ready = true;
-			  while(ret--)
-			  {
-				  while(!tx_ready);
-				  usart_send(m_serial_no, *ptr++);
-			  }*/
 		    }
 
 		  va_end (ap);
 	}
 
-	void
+	boolean
 	WaitReceiveData(uint32 timeout = 1000)
 	{
-		uint32 milli_end = systick_get_milli() + timeout;
-
-		while(!mReceived && (systick_get_milli() < milli_end));
-
-		if(!mReceived)
-		{
-			strcpy(rx_buffer, "Timeout!\r\n");
-		}
+		return usart_wait_receive(m_serial_no, timeout);
 	}
 
 	void

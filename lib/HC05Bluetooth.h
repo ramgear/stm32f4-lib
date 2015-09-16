@@ -27,7 +27,7 @@ extern "C"
 /* Exported types ------------------------------------------------------------*/
 
 /* Exported constants --------------------------------------------------------*/
-#define	HC05_DEFAULT_SPEED	115200	// 1382400
+#define	HC05_DEFAULT_SPEED	1382400
 #define	HC05_CMD_SPEED	38400
 
 #define	HC05_DEFAULT_NAME	"RAM-BT"
@@ -80,26 +80,14 @@ public:
 	{
 		HardwareSerial::OnRxInterrupt(count);
 
-		if(!strncmp(rx_buffer, "AT\r\n", 4) || !strncmp(rx_buffer, "AT+", 3))
+		if(rx_buffer[0] == '!')
 		{
 			mProcessCmd = true;
 		}
 	}
 
 	void
-	ProcessCommand(const char *cmd)
-	{
-		Send("Command: %s", cmd);
-
-		EnterCmdMode();
-		Send("%s", cmd);
-		WaitReceiveData(1000);
-		ExitCmdMode();
-
-		/* Send command response */
-		GetReceivedData(mMsgBuffer);
-		Send("Response: %s", mMsgBuffer);
-	}
+	ProcessCommand(char *cmd);
 
 	void
 	OnStatChanged(void)
@@ -120,19 +108,46 @@ public:
 	void
 	SetName(const char *name)
 	{
+		trace("Set name to \"%s\"\n", name);
 		Send("AT+NAME=%s\r\n", name);
+		if(!WaitReceiveData(100))
+		{
+			trace("Timeout!\n");
+		}
+		else
+		{
+			trace("Response: %s", rx_buffer);
+		}
 	}
 
 	void
 	SetPassword(const char *pwd)
 	{
+		trace("Set password to \"%s\"\n", pwd);
 		Send("AT+PSWD=%s\r\n", pwd);
+		if(!WaitReceiveData(100))
+		{
+			trace("Timeout!\n");
+		}
+		else
+		{
+			trace("Response: %s", rx_buffer);
+		}
 	}
 
 	void
 	SetSpeed(uint32 speed)
 	{
+		trace("Set speed to \"%d\"\n", speed);
 		Send("AT+UART=%d,0,0\r\n", speed);
+		if(!WaitReceiveData(100))
+		{
+			trace("Timeout!\n");
+		}
+		else
+		{
+			trace("Response: %s", rx_buffer);
+		}
 	}
 
 	void
@@ -166,14 +181,14 @@ public:
 	PowerOn(void)
 	{
 		m_PwrPin = false;
-		Delay::Milli(10);
+		Delay::Milli(100);
 	}
 
 	void
 	PowerOff(void)
 	{
 		m_PwrPin = true;
-		Delay::Milli(10);
+		Delay::Milli(3000);
 	}
 
 	void
