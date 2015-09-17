@@ -26,15 +26,12 @@ SHELL_FUNC(restart);
 SHELL_FUNC(flash);
 
 /* List command table here */
-__lookup_table
-shell_t cmd_shell_table[] =
-{
-		SHELL_ENTRY(echo),
-		SHELL_ENTRY(reset),
-		SHELL_ENTRY(restart),
-		SHELL_ENTRY(flash),
-		{ NULL, NULL}
-};
+SHELL_TABLE_BEGIN
+SHELL_ENTRY(echo,"Echo message.")
+SHELL_ENTRY(reset,"Bluetooth re-configuration.")
+SHELL_ENTRY(restart,"Restart software.")
+SHELL_ENTRY(flash,"Flash firmware.")
+SHELL_TABLE_END
 
 /* Implement command here */
 SHELL_FUNC(echo)
@@ -42,7 +39,7 @@ SHELL_FUNC(echo)
 	HC05Bluetooth *obj = (HC05Bluetooth *)caller;
 	(void)argv;
 
-	obj->Send("%s\r\n", SHELL_ARG(1));
+	obj->Send("%s\r\n", argv[1]);
 }
 
 SHELL_FUNC(reset)
@@ -63,8 +60,39 @@ SHELL_FUNC(restart)
 
 SHELL_FUNC(flash)
 {
-	//uint32 idx = getopt(argc, argv, "");
+	static int address = 0;
+	static int size = 0;
+	static shell_option_t long_options[] =
+	{
+			{ "addr", required_argument, 0, 'a' },
+			{ "size", required_argument, 0, 's' },
+			{0, 0, 0, 0}
+	};
+	static shell_opt_param opt_param[] =
+	{
+			{ &long_options[0],  &address, shell_strtol },
+			{ &long_options[1],  &size, shell_strtol },
+			{0, 0, 0}
+	};
+
+	/* Parse option to variables */
+	shell_parse_option(argc, argv, "as:", long_options, opt_param);
+
+	if(address != 0 && size != 0)
+	{
+		trace("Flash address: 0x%08X size: %d\r\n", address, size);
+	}
 }
+
+}
+
+void
+shell_puts(void *caller, const char *str)
+{
+	HC05Bluetooth *obj = (HC05Bluetooth *)caller;
+
+	obj->WaitTransmitReady();
+	obj->Send("%s\r\n", str);
 
 }
 
@@ -86,5 +114,5 @@ HC05Bluetooth::Begin(uint32 speed)
 void
 HC05Bluetooth::ProcessCommand(char *cmd)
 {
-	shell_exec(cmd_shell_table, cmd, this);
+	shell_exec(this, cmd);
 }

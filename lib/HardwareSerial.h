@@ -119,6 +119,12 @@ public:
 		return usart_wait_receive(m_serial_no, timeout);
 	}
 
+	boolean
+	WaitTransmitReady(uint32 timeout = 1000)
+	{
+		return usart_wait_transmit_ready(m_serial_no, timeout);
+	}
+
 	void
 	GetReceivedData(char *data)
 	{

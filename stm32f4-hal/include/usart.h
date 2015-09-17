@@ -88,6 +88,9 @@ usart_read(usart_num num, uint08 *data, uint32 count);
 boolean
 usart_wait_receive(usart_num num, uint32 timeout);
 
+boolean
+usart_wait_transmit_ready(usart_num num, uint32 timeout);
+
 #ifdef __cplusplus
 }
 #endif

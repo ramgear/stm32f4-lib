@@ -67,8 +67,6 @@ main(int argc, char* argv[])
 	hc05.m_StatPin 	= PB0;
 	hc05.Begin();
 
-	//hc05.ConfigureDevice();
-
   // Infinite loop
 	char buff[64];
   while (1)

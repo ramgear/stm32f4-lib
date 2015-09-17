@@ -47,6 +47,17 @@ typedef struct usart_dma
 	uint32			tx_stream_base;
 } usart_dma;
 
+typedef union usart_flags
+{
+	uint32		flags;
+	struct
+	{
+		uint32	rx_rdy		:1;
+		uint32	tx_rdy		:1;
+	} b;
+
+} usart_flags;
+
 typedef struct usart_driver
 {
 	const usart_dev		*p_dev;
@@ -58,7 +69,7 @@ typedef struct usart_driver
 	uint08				rx_head;
 	uint08				rx_tail;
 	const usart_dma		*p_usart_dma;
-	volatile boolean				received;
+	volatile usart_flags	ctrl;
 } usart_driver;
 
 __lookup_table
@@ -394,14 +405,30 @@ usart_wait_receive(usart_num num, uint32 timeout)
 	usart_driver *driver = &usart_drivers[num];
 	uint32 end_ms = systick_get_milli() + timeout;
 
-	driver->received = false;
-	while(!driver->received)
+	driver->ctrl.b.rx_rdy = false;
+	while(!driver->ctrl.b.rx_rdy)
 	{
 		if(systick_get_milli() > end_ms)
 			break;
 	}
 
-	return driver->received;
+	return driver->ctrl.b.rx_rdy;
+}
+
+boolean
+usart_wait_transmit_ready(usart_num num, uint32 timeout)
+{
+	usart_driver *driver = &usart_drivers[num];
+	uint32 end_ms = systick_get_milli() + timeout;
+
+	driver->ctrl.b.tx_rdy = false;
+	while(!driver->ctrl.b.tx_rdy)
+	{
+		if(systick_get_milli() > end_ms)
+			break;
+	}
+
+	return driver->ctrl.b.tx_rdy;
 }
 
 static void
@@ -428,7 +455,7 @@ usart_irq_handler(usart_num num)
 		}
 
 		/* Set data received flag on idle detected */
-		driver->received = true;
+		driver->ctrl.b.rx_rdy = true;
 
 		/* framing is end then callback to handler with rx buffer data */
 		(*driver->rx_handler)(driver->p_owner, count);
@@ -497,14 +524,15 @@ usart_dma_rx_handler(void *owner, dma_num num, dma_stream stream)
 void
 usart_dma_tx_handler(void *owner, dma_num num, dma_stream stream)
 {
-	(void)owner;
-	//usart_driver *driver = (usart_driver *)owner;
-	//dma_stream_t *p_stream = (dma_stream_t *)driver->p_usart_dma->tx_stream_base;
+	usart_driver *driver = (usart_driver *)owner;
 
 	/* Check complete transfer interrupt flag */
 	if(dma_get_it(num, stream, DMA_IT_TC) != RESET)
 	{
 		/* Clear pending */
 		dma_clear_it_pending(num, stream, DMA_IT_TC);
+
+		/* Set data transmit data ready */
+		driver->ctrl.b.tx_rdy = true;
 	}
 }
