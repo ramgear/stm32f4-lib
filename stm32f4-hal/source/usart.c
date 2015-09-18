@@ -52,6 +52,8 @@ typedef union usart_flags
 	uint32		flags;
 	struct
 	{
+		uint32	rx_head		:8;
+		uint32	rx_tail		:8;
 		uint32	rx_rdy		:1;
 		uint32	tx_rdy		:1;
 	} b;
@@ -66,8 +68,6 @@ typedef struct usart_driver
 	usart_tx_handler	tx_handler;
 	uint08				rx_buffer[USART_BUFFER_SIZE];
 	uint08				tx_buffer[USART_BUFFER_SIZE];
-	uint08				rx_head;
-	uint08				rx_tail;
 	const usart_dma		*p_usart_dma;
 	volatile usart_flags	ctrl;
 } usart_driver;
@@ -377,23 +377,23 @@ usart_read(usart_num num, uint08 *data, uint32 count)
 	uint08	*ptr;
 
 	/* Copy received data */
-	if(driver->rx_head + count < USART_BUFFER_SIZE)
+	if(driver->ctrl.b.rx_head + count < USART_BUFFER_SIZE)
 	{
-		memcpy(data, driver->rx_buffer + driver->rx_head, count);
+		memcpy(data, driver->rx_buffer + driver->ctrl.b.rx_head, count);
 
 		/* update current head */
-		driver->rx_head += count;
+		driver->ctrl.b.rx_head += count;
 	}
 	else
 	{
 		ptr = data;
-		len = USART_BUFFER_SIZE - driver->rx_head;
-		memcpy(ptr, driver->rx_buffer + driver->rx_head, len);
+		len = USART_BUFFER_SIZE - driver->ctrl.b.rx_head;
+		memcpy(ptr, driver->rx_buffer + driver->ctrl.b.rx_head, len);
 		ptr += len;
 		len = count - len;
 		memcpy(ptr, driver->rx_buffer, len);
 
-		driver->rx_head = len;
+		driver->ctrl.b.rx_head = len;
 	}
 
 	//driver->received = false;
@@ -443,15 +443,15 @@ usart_irq_handler(usart_num num)
 	{
 		(void)((usart_t *)driver->p_dev->reg)->DR;
 
-		driver->rx_tail = USART_BUFFER_SIZE - stream->NDTR;
+		driver->ctrl.b.rx_tail = USART_BUFFER_SIZE - stream->NDTR;
 
-		if(driver->rx_head > driver->rx_tail)
+		if(driver->ctrl.b.rx_head > driver->ctrl.b.rx_tail)
 		{
-			count = (USART_BUFFER_SIZE - driver->rx_head) + driver->rx_tail;
+			count = (USART_BUFFER_SIZE - driver->ctrl.b.rx_head) + driver->ctrl.b.rx_tail;
 		}
 		else
 		{
-			count = driver->rx_tail - driver->rx_head;
+			count = driver->ctrl.b.rx_tail - driver->ctrl.b.rx_head;
 		}
 
 		/* Set data received flag on idle detected */
@@ -514,7 +514,7 @@ usart_dma_rx_handler(void *owner, dma_num num, dma_stream stream)
 		dma_clear_it_pending(num, stream, DMA_IT_TC);
 
 		/* Reset tail of buffer */
-		driver->rx_tail = 0;
+		driver->ctrl.b.rx_tail = 0;
 	}
 
 	/* Clear error flag */
