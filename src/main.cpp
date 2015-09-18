@@ -67,6 +67,8 @@ main(int argc, char* argv[])
 	hc05.m_StatPin 	= PB0;
 	hc05.Begin();
 
+	led3 = true;
+
   // Infinite loop
 	char buff[64];
   while (1)

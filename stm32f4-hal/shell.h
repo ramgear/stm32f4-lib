@@ -24,8 +24,6 @@
  typedef	void	(*shell_func_t)(void *caller, int argc, char *const argv[]);
  typedef	void	(*shell_get_opt)(const char *str, void *val);
 
- typedef struct option	shell_option_t;
-
  typedef struct shell_t
  {
  	const char		*cmd;
@@ -33,16 +31,19 @@
  	const char		*description;
  } shell_t;
 
- typedef struct shell_opt_param
+ typedef struct shell_option_t
  {
-	 shell_option_t		*p_option;
+	 char				opt_char;
 	 void				*p_val;
-	 shell_get_opt		get_opt;
- } shell_opt_param;
+	 shell_get_opt		get_val;
+	 int				reset_val;
+ } shell_option_t;
 
 /* Exported constants --------------------------------------------------------*/
 #define	SHELL_MAX_ARG_COUNT		16
 #define	SHELL_MAX_ARG_LEN		16
+
+#define	SHELL_NOT_FOUND			-1
 
 /* Exported macro ------------------------------------------------------------*/
 
@@ -52,13 +53,14 @@
 			__attribute__ ((unused)) int argc, 		\
 			__attribute__ ((unused)) char *const argv[])
 
-#define	SHELL_ENTRY(name,desc)	{.cmd = #name, .func = shell_##name, .description = desc},
+#define	SHELL_ENTRY(name,desc)	\
+	{.cmd = #name, .func = shell_##name, .description = desc},
 
 #define	SHELL_TABLE_BEGIN		\
 		const shell_t shell_tables[] = {
 #define	SHELL_TABLE_END				\
 			SHELL_ENTRY(help,"Print command list.")		\
-			{ .cmd = NULL, .func = NULL, .description = NULL }	\
+			{ NULL, NULL, NULL }	\
 		};
 
 
@@ -74,12 +76,19 @@ shell_strtol(const char *str, void *val)
  		sscanf(str, "%d", ptr);
 }
 
+CPU_INL_FUNC
+void
+shell_strcpy(const char *str, void *val)
+{
+	strcpy((char *)val, str);
+}
+
 /* Exported functions --------------------------------------------------------*/
 sint32
 shell_exec(void *caller, char *p_cmd);
 
-void
-shell_parse_option(int argc, char *const *argv, const char *shortopts, const shell_option_t *longopts, shell_opt_param *p_opt);
+boolean
+shell_parse_option(int argc, char *const *argv, const char *shortopts, shell_option_t *p_opt);
 
 void
 shell_puts(void *caller, const char *str);

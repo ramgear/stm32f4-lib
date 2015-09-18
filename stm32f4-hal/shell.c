@@ -81,15 +81,31 @@ shell_exec(void *caller, char *p_cmd)
 	return -2;
 }
 
-void
-shell_parse_option(int argc, char *const *argv, const char *shortopts, const shell_option_t *longopts, shell_opt_param *p_opt)
+static void
+shell_clear_opt(shell_option_t *p_opt)
+{
+	shell_option_t *opt = p_opt;
+	opt = p_opt;
+	while(opt->opt_char != 0)
+	{
+		*((int *)opt->p_val) = opt->reset_val;
+
+		opt++;
+	}
+}
+
+boolean
+shell_parse_option(int argc, char *const *argv, const char *shortopts, shell_option_t *p_opt)
 {
 	int c;
-	int option_index = 0;
-	shell_opt_param *param;
+	shell_option_t *opt;
+
+	/* Clear parameter */
+	shell_clear_opt(p_opt);
 
 	optind = 0;
-	c = getopt_long(argc, argv, shortopts, longopts, &option_index);
+	opterr = 0;
+	c = getopt(argc, argv, shortopts);
 
 	while(c != -1)
 	{
@@ -97,23 +113,28 @@ shell_parse_option(int argc, char *const *argv, const char *shortopts, const she
 		{
 	        case '?':
 	          /* getopt_long already printed an error message. */
-	          break;
+	        	return false;
 	        default:
-	        	param = p_opt;
-	        	while(param->p_option != NULL)
+	        	opt = p_opt;
+	        	while(opt->opt_char != 0)
 	        	{
-	        		if(param->p_option->val == c)
+	        		if(opt->opt_char == c)
 	        		{
-	        			(*param->get_opt)(optarg, param->p_val);
+	        			if(opt->get_val != NULL && optarg != NULL)
+	        				(*opt->get_val)(optarg, opt->p_val);
+	        			else
+	        				*((int *)opt->p_val) = c;
+
 	        			break;
 	        		}
-	        		param++;
+	        		opt++;
 	        	}
 		}
 
-		c = getopt_long(argc, argv, shortopts, longopts, &option_index);
+		c = getopt(argc, argv, shortopts);
 	}
 
+	return true;
 }
 
 SHELL_FUNC(help)

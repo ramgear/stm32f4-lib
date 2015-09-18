@@ -259,6 +259,14 @@ gpio_release(gpio_pin pin)
 	trace("Release pin P%c%d completed.\n", port_alias_table[dev->port], dev->pin);
 }
 
+gpio_mode
+gpio_get_mode(const gpio_pin_dev *dev)
+{
+    gpio_reg *regs = gpio_get_reg(dev->port);
+
+	return (gpio_mode)CPU_GET_VAL(regs->MODER, 3 << dev->pin * 2);
+}
+
 void
 gpio_set_mode(const gpio_pin_dev *dev, gpio_mode mode)
 {
@@ -320,7 +328,11 @@ gpio_toggle_bit(const gpio_pin_dev *dev)
 boolean
 gpio_read_bit(const gpio_pin_dev *dev)
 {
-    return (gpio_get_reg(dev->port)->IDR & (1 << dev->pin));
+	gpio_mode mode = gpio_get_mode(dev);
+	if(mode == GPIO_MODE_INPUT)
+		return (gpio_get_reg(dev->port)->IDR & (1 << dev->pin));
+	else
+		return (gpio_get_reg(dev->port)->ODR & (1 << dev->pin));
 }
 
 boolean

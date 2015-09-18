@@ -19,7 +19,8 @@
 
 #include <cpu.h>
 
-#define	GPIO_PORT_NUM	9
+#define	GPIO_PORT_NUM		9
+#define	GPIO_PIN_PER_PORT	16
 
  /**********************************************************************************
   * GPIO Types
@@ -274,6 +275,9 @@ gpio_available(gpio_pin pin);
 
 void
 gpio_release(gpio_pin pin);
+
+gpio_mode
+gpio_get_mode(const gpio_pin_dev *dev);
 
 void
 gpio_set_mode(const gpio_pin_dev *dev, gpio_mode mode);
