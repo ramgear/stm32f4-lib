@@ -279,6 +279,15 @@ gpio_release(gpio_pin pin);
 gpio_mode
 gpio_get_mode(const gpio_pin_dev *dev);
 
+gpio_output
+gpio_get_otype(const gpio_pin_dev *dev);
+
+gpio_speed
+gpio_get_speed(const gpio_pin_dev *dev);
+
+gpio_pupd
+gpio_get_pupd(const gpio_pin_dev *dev);
+
 void
 gpio_set_mode(const gpio_pin_dev *dev, gpio_mode mode);
 

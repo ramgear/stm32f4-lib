@@ -267,6 +267,30 @@ gpio_get_mode(const gpio_pin_dev *dev)
 	return (gpio_mode)CPU_GET_VAL(regs->MODER, 3 << dev->pin * 2);
 }
 
+gpio_output
+gpio_get_otype(const gpio_pin_dev *dev)
+{
+    gpio_reg *regs = gpio_get_reg(dev->port);
+
+	return (gpio_output)CPU_GET_VAL(regs->OTYPER, 1 << dev->pin);
+}
+
+gpio_speed
+gpio_get_speed(const gpio_pin_dev *dev)
+{
+    gpio_reg *regs = gpio_get_reg(dev->port);
+
+	return (gpio_speed)CPU_GET_VAL(regs->OSPEEDR, 3 << dev->pin * 2);
+}
+
+gpio_pupd
+gpio_get_pupd(const gpio_pin_dev *dev)
+{
+    gpio_reg *regs = gpio_get_reg(dev->port);
+
+	return (gpio_pupd)CPU_GET_VAL(regs->PUPDR, 3 << dev->pin * 2);
+}
+
 void
 gpio_set_mode(const gpio_pin_dev *dev, gpio_mode mode)
 {
@@ -330,9 +354,9 @@ gpio_read_bit(const gpio_pin_dev *dev)
 {
 	gpio_mode mode = gpio_get_mode(dev);
 	if(mode == GPIO_MODE_INPUT)
-		return (gpio_get_reg(dev->port)->IDR & (1 << dev->pin));
+		return CPU_GET_VAL(gpio_get_reg(dev->port)->IDR, 1 << dev->pin);
 	else
-		return (gpio_get_reg(dev->port)->ODR & (1 << dev->pin));
+		return CPU_GET_VAL(gpio_get_reg(dev->port)->ODR, 1 << dev->pin);
 }
 
 boolean

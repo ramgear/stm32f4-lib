@@ -66,7 +66,7 @@
 
 CPU_INL_FUNC
 void
-shell_strtol(const char *str, void *val)
+shell_arg2int(const char *str, void *val)
 {
 	int *ptr = (int *)val;
 
@@ -78,9 +78,23 @@ shell_strtol(const char *str, void *val)
 
 CPU_INL_FUNC
 void
-shell_strcpy(const char *str, void *val)
+shell_arg2str(const char *str, void *val)
 {
 	strcpy((char *)val, str);
+}
+
+CPU_INL_FUNC
+void
+shell_arg2char(const char *str, void *val)
+{
+	*(char *)val = *str;
+}
+
+CPU_INL_FUNC
+boolean
+shell_is_found(int val)
+{
+	return (val != SHELL_NOT_FOUND);
 }
 
 /* Exported functions --------------------------------------------------------*/

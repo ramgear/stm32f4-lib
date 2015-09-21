@@ -64,8 +64,8 @@ SHELL_FUNC(flash)
 
 	static shell_option_t opt_param[] =
 	{
-			{ 'a',  &address, shell_strtol, SHELL_NOT_FOUND },
-			{ 's',  &size, shell_strtol, SHELL_NOT_FOUND },
+			{ 'a',  &address, shell_arg2str, SHELL_NOT_FOUND },
+			{ 's',  &size, shell_arg2str, SHELL_NOT_FOUND },
 			{0, 0, 0, 0}
 	};
 

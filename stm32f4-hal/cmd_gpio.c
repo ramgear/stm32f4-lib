@@ -10,7 +10,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "cmd_gpio.h"
+#include <ctype.h>
 
+char	_port;
 char	_pin_opt[5];
 char	_mode_opt[4];
 char	_otype_opt[3];
@@ -19,19 +21,54 @@ char	_pupd_opt[2];
 int		_read_opt;
 int		_write_opt;
 
-const char	_short_option[] = "n:m:t:s:p:rw:";
+const char	_short_option[]	= "P:n:m:t:s:p:rw:";
+const char	*_mode_table[]	= { "in", "out", "af", "an", 0 };
+const char	*_otype_table[] = { "pp", "od", 0 };
+const char	*_speed_table[] = { "l", "m", "f", "h", 0 };
+const char	*_pupd_table[] 	= { "no", "pu", "pd", "na", 0 };
 
 shell_option_t opt_param[] =
 {
-	{ 'n',  _pin_opt, shell_strcpy, SHELL_NOT_FOUND },
-	{ 'm',  _mode_opt, shell_strcpy, SHELL_NOT_FOUND },
-	{ 't',  _otype_opt, shell_strcpy, SHELL_NOT_FOUND },
-	{ 's',  _speed_opt, shell_strcpy, SHELL_NOT_FOUND },
-	{ 'p',  _pupd_opt, shell_strcpy, SHELL_NOT_FOUND },
+	{ 'P',  &_port, shell_arg2char, SHELL_NOT_FOUND },
+	{ 'n',  _pin_opt, shell_arg2str, SHELL_NOT_FOUND },
+	{ 'm',  _mode_opt, shell_arg2str, SHELL_NOT_FOUND },
+	{ 't',  _otype_opt, shell_arg2str, SHELL_NOT_FOUND },
+	{ 's',  _speed_opt, shell_arg2str, SHELL_NOT_FOUND },
+	{ 'p',  _pupd_opt, shell_arg2str, SHELL_NOT_FOUND },
 	{ 'r',  &_read_opt, NULL, SHELL_NOT_FOUND },
-	{ 'w',  &_write_opt, shell_strtol, SHELL_NOT_FOUND },
+	{ 'w',  &_write_opt, shell_arg2int, SHELL_NOT_FOUND },
 	{ 0, 0, 0, 0 }
 };
+
+CPU_INL_FUNC
+void
+shell_gpio_print_header(void *caller)
+{
+	shell_puts(caller, "----------------------------------------------\r\n");
+	shell_puts(caller, "  PIN  | MODE | OTYPE | SPEED | PUPD | VALUE  \r\n");
+	shell_puts(caller, "----------------------------------------------\r\n");
+}
+
+CPU_INL_FUNC
+void
+shell_gpio_print_footer(void *caller)
+{
+	shell_puts(caller, "----------------------------------------------\r\n");
+}
+
+CPU_INL_FUNC
+void
+shell_gpio_print_info(void *caller, const gpio_pin_dev *dev, int port, int pin)
+{
+	shell_printf(caller, "  P%c%02d   %-7s%-8s%-8s%-7s%-5d \r\n"
+			, toupper(port)
+			, pin
+			, _mode_table[gpio_get_mode(dev)]
+			, _otype_table[gpio_get_otype(dev)]
+			, _speed_table[gpio_get_speed(dev)]
+			, _pupd_table[gpio_get_pupd(dev)]
+			, (int)gpio_read_bit(dev));
+}
 
 SHELL_FUNC(gpio)
 {
@@ -42,50 +79,154 @@ SHELL_FUNC(gpio)
 		return;
 	}
 
-	char  port;
 	int  pin_no;
-	int	value;
+	const gpio_pin_dev *dev = NULL;
+	gpio_pin pin;
+	int	port;
+	boolean done;
 
-	sscanf(_pin_opt, "p%c%d",&port, &pin_no);
-	if(port < 'a' || port > 'i' || pin_no > 15)
+	if(shell_is_found((int)_port))
 	{
-		shell_puts(caller, "Invalid pin input!");
-		return;
-	}
-
-	gpio_pin pin = (gpio_pin)((port - 'a') * GPIO_PIN_PER_PORT + pin_no);
-	const gpio_pin_dev *dev = gpio_get_dev(pin);
-	gpio_mode mode = gpio_get_mode(dev);
-
-	if(_read_opt != SHELL_NOT_FOUND)
-	{
-		/* Read operation */
-		value = gpio_read_bit(dev);
-
-		shell_printf(caller, "Pin %-4s [%s]  = %d\r\n"
-				, _pin_opt
-				, (mode == GPIO_MODE_INPUT) ? "in" : "out"
-				, value);
-
-	}
-	else if(_write_opt != SHELL_NOT_FOUND)
-	{
-		/* Write operation */
-		if(mode == GPIO_MODE_OUTPUT)
+		shell_gpio_print_header(caller);
+		port = _port - 'a';
+		for(int i = 0; i < GPIO_PIN_PER_PORT; ++i)
 		{
-			if(_write_opt != 0)
-				gpio_set_bit(dev);
+			pin = (gpio_pin)(port * GPIO_PIN_PER_PORT + i);
+			dev = gpio_get_dev(pin);
+
+			shell_gpio_print_info(caller, dev, port, i);
+		}
+		shell_gpio_print_footer(caller);
+
+	}
+	else if(shell_is_found(*(int *)_pin_opt))
+	{
+		int value;
+
+		sscanf(_pin_opt, "p%c%d",&_port, &pin_no);
+		if(_port < 'a' || _port > 'i' || pin_no > 15)
+		{
+			shell_puts(caller, "Invalid pin input!");
+			return;
+		}
+
+		port = _port - 'a';
+		pin = (gpio_pin)(port * GPIO_PIN_PER_PORT + pin_no);
+		dev = gpio_get_dev(pin);
+
+		if(shell_is_found(_read_opt))
+		{
+			shell_printf(caller, "Pin %-4s [%3s]  = %d\r\n"
+					, _pin_opt
+					, _mode_table[gpio_get_mode(dev)]
+					, gpio_read_bit(dev));
+
+		}
+		else if(shell_is_found(_write_opt))
+		{
+			gpio_mode mode = gpio_get_mode(dev);
+
+			/* Write operation */
+			if(mode == GPIO_MODE_OUTPUT)
+			{
+				if(_write_opt != 0)
+					gpio_set_bit(dev);
+				else
+					gpio_clear_bit(dev);
+			}
 			else
-				gpio_clear_bit(dev);
+			{
+				shell_printf(caller, "Pin %-4s is \"%s\" mode! Only \"%s\" mode can write!\r\n"
+						, _pin_opt
+						, _mode_table[gpio_get_mode(dev)]
+						, _mode_table[GPIO_MODE_OUTPUT]
+						);
+			}
 		}
 		else
 		{
-			shell_printf(caller, "Pin %-4s isn't output mode!\r\n" , _pin_opt);
+			/* Configure operation */
+
+			/* Set Mode */
+			if(shell_is_found(shell_is_found(*(int *)_mode_opt)))
+			{
+				done = false;
+				value = 0;
+				while(*_mode_table[value] != 0)
+				{
+					if(!strcmp(_mode_table[value], _mode_opt))
+					{
+						gpio_set_mode(dev, (gpio_mode)value);
+						done = true;
+						break;
+
+					}
+					value++;
+				}
+				if(!done)
+					shell_printf(caller, "Mode \"%s\" not available!", _mode_opt);
+			}
+			/* Set Output type */
+			if(shell_is_found(shell_is_found(*(int *)_otype_opt)))
+			{
+				done = false;
+				value = 0;
+				while(*_otype_table[value] != 0)
+				{
+					if(!strcmp(_otype_table[value], _otype_opt))
+					{
+						gpio_set_output(dev, (gpio_output)value);
+						done = true;
+						break;
+
+					}
+					value++;
+				}
+				if(!done)
+					shell_printf(caller, "Output type \"%s\" not available!", _otype_opt);
+			}
+			/* Set Speed */
+			if(shell_is_found(shell_is_found(*(int *)_speed_opt)))
+			{
+				done = false;
+				value = 0;
+				while(*_speed_table[value] != 0)
+				{
+					if(!strcmp(_speed_table[value], _speed_opt))
+					{
+						gpio_set_speed(dev, (gpio_speed)value);
+						done = true;
+						break;
+
+					}
+					value++;
+				}
+				if(!done)
+					shell_printf(caller, "Speed \"%s\" not available!", _speed_opt);
+			}
+			/* Set Pull-up Pull-down */
+			if(shell_is_found(shell_is_found(*(int *)_pupd_opt)))
+			{
+				done = false;
+				value = 0;
+				while(*_pupd_table[value] != 0)
+				{
+					if(!strcmp(_pupd_table[value], _pupd_opt))
+					{
+						gpio_set_pupd(dev, (gpio_speed)value);
+						done = true;
+						break;
+
+					}
+					value++;
+				}
+				if(!done)
+					shell_printf(caller, "Pull \"%s\" not available!", _pupd_opt);
+			}
+			shell_gpio_print_header(caller);
+			shell_gpio_print_info(caller, dev, port, pin_no);
+			shell_gpio_print_footer(caller);
 		}
-	}
-	else
-	{
-		/* Configure operation */
 	}
 }
 
