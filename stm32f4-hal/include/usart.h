@@ -22,7 +22,7 @@
 #include <nvic.h>
 #include <gpio.h>
 
-#define	USART_BUFFER_SIZE		64
+#define	USART_BUFFER_SIZE		128
 #define	USART_RX_BUFFER_SIZE	USART_BUFFER_SIZE
 #define	USART_TX_BUFFER_SIZE	USART_BUFFER_SIZE
 #define	USART_FRAME_STX			0x02

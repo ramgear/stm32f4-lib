@@ -22,8 +22,9 @@ char	_speed_opt[2];
 char	_pupd_opt[2];
 int		_read_opt;
 int		_write_opt;
+int		_help;
 
-const char	_short_option[]	= "P:n:m:t:s:p:rw:";
+const char	_short_option[]	= "hP:n:m:t:s:p:rw:";
 const char	*_mode_table[]	= { "in", "out", "af", "an", 0 };
 const char	*_otype_table[] = { "pp", "od", 0 };
 const char	*_speed_table[] = { "l", "m", "f", "h", 0 };
@@ -31,6 +32,7 @@ const char	*_pupd_table[] 	= { "no", "pu", "pd", "na", 0 };
 
 shell_option_t opt_param[] =
 {
+	{ 'h',  &_help, shell_arg2int, SHELL_NOT_FOUND },
 	{ 'P',  &_port, shell_arg2char, SHELL_NOT_FOUND },
 	{ 'n',  _pin_opt, shell_arg2str, SHELL_NOT_FOUND },
 	{ 'm',  _mode_opt, shell_arg2str, SHELL_NOT_FOUND },
@@ -46,16 +48,16 @@ CPU_INL_FUNC
 void
 shell_gpio_print_header(void *caller)
 {
-	shell_puts(caller, "----------------------------------------------\r\n");
-	shell_puts(caller, "  PIN  | MODE | OTYPE | SPEED | PUPD | VALUE  \r\n");
-	shell_puts(caller, "----------------------------------------------\r\n");
+	shell_puts(caller, shell_dash_line);
+	shell_puts(caller, "  PIN  | MODE | OTYPE | SPEED | PUPD | VALUE");
+	shell_puts(caller, shell_dash_line);
 }
 
 CPU_INL_FUNC
 void
 shell_gpio_print_footer(void *caller)
 {
-	shell_puts(caller, "----------------------------------------------\r\n");
+	shell_puts(caller, shell_dash_line);
 }
 
 CPU_INL_FUNC
@@ -96,6 +98,26 @@ SHELL_FUNC(gpio)
 	if(!shell_parse_option(argc, argv, _short_option, opt_param))
 	{
 		shell_puts(caller, "Invalid format!");
+		return;
+	}
+
+	if(shell_is_found(_help))
+	{
+		shell_puts(caller, "GPIO Command Help.");
+		shell_puts(caller, shell_dash_line);
+		shell_puts(caller, " !gpio [options]\r\n");
+		shell_puts(caller, "   -P [a..i]\t\tTo print all pin status for specify port.\r\n");
+		shell_puts(caller, "   -n p[a..i][0..15]\tTo specify pin.\r\n");
+		shell_puts(caller, "   -m [in|out]\t\tTo set mode.\r\n");
+		shell_puts(caller, "   -t [pp|od]\t\tTo set output type.");
+		shell_puts(caller, "   where, pp = push pull, od = open drain\r\n");
+		shell_puts(caller, "   -s [l|m|f|h]\t\tTo set output speed.");
+		shell_puts(caller, "   where, l = low, m = medium, f = fast, h = high.\r\n");
+		shell_puts(caller, "   -p [no|pu|pd]\tTo set pull-up pull-down.");
+		shell_puts(caller, "   where, no = no pull-up/pull-down, pu = pull-up, pd = pull-down.\r\n");
+		shell_puts(caller, "   -r \t\t\tTo read value.\r\n");
+		shell_puts(caller, "   -w [0|1]\t\tTo write value.\r\n");
+		shell_gpio_print_footer(caller);
 		return;
 	}
 

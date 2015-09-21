@@ -45,6 +45,10 @@
 
 #define	SHELL_NOT_FOUND			-1
 
+__attribute__ ((unused))
+static const
+char *shell_dash_line = "------------------------------------------------------------";
+
 /* Exported macro ------------------------------------------------------------*/
 
 #define	SHELL_FUNC(name)	\

@@ -10,6 +10,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "shell.h"
+#include "usart.h"
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -140,15 +141,19 @@ shell_parse_option(int argc, char *const *argv, const char *shortopts, shell_opt
 SHELL_FUNC(help)
 {
 	const shell_t *p_shell = shell_tables;
-	char buffer[64];
+	char buffer[USART_TX_BUFFER_SIZE];
 
 	shell_puts(caller, "Command List:");
+	shell_puts(caller, shell_dash_line);
+	shell_puts(caller, "  Command Name | Description");
+	shell_puts(caller, shell_dash_line);
 	while(p_shell->cmd != NULL)
 	{
-		sprintf(buffer, "  %-8s -> %s", p_shell->cmd, p_shell->description);
+		sprintf(buffer, "  %-12s   %s", p_shell->cmd, p_shell->description);
 		shell_puts(caller, buffer);
 		p_shell++;
 	}
+	shell_puts(caller, shell_dash_line);
 }
 
 /*****************************END OF FILE**************************************/
